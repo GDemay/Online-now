@@ -24,7 +24,7 @@ cd "$SCRIPT_DIR"
 # Project settings
 PROJECT="OnlineNow.xcodeproj"
 SCHEME="OnlineNow"
-DESTINATION="platform=iOS Simulator,name=iPhone 14,OS=latest"
+DESTINATION="platform=iOS Simulator,OS=latest"
 
 echo "📦 Building Online Now..."
 echo ""
