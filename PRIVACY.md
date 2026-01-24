@@ -123,7 +123,7 @@ Under the General Data Protection Regulation (GDPR), European users have certain
 
 If you have questions about this Privacy Policy, please:
 - Open an issue on our GitHub repository: https://github.com/GDemay/Online-now
-- Email: [Your contact email]
+- Email: guillaumedemay@hotmail.fr
 
 ## Your Consent
 
