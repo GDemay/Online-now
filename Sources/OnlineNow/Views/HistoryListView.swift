@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Displays the history of connectivity checks with premium design
-@available(iOS 17.0, *)
+/// Note: Requires iOS 17+ for SwiftData integration
+@available(iOS 17.0, macOS 14.0, *)
 public struct HistoryListView: View {
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var historyManager: HistoryManager

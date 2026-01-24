@@ -1,9 +1,11 @@
 import Foundation
 import Network
 import SystemConfiguration
+import Combine
 
 /// A monitor that observes network connectivity status in real-time
-@available(iOS 17.0, *)
+/// Supports iOS 15+, macOS 12+, watchOS 8+
+@available(iOS 15.0, macOS 12.0, watchOS 8.0, *)
 public class NetworkMonitor: ObservableObject {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "NetworkMonitor")
@@ -11,7 +13,7 @@ public class NetworkMonitor: ObservableObject {
     /// Whether the device has network connectivity
     @Published public private(set) var isConnected: Bool = false
 
-    /// Current connection type
+    /// Current connection type (uses OnlineNow's unified ConnectionType)
     @Published public private(set) var connectionType: ConnectionType = .unknown
 
     /// Whether a VPN is currently active
@@ -25,22 +27,6 @@ public class NetworkMonitor: ObservableObject {
 
     /// Current network path for detailed inspection
     private var currentPath: NWPath?
-
-    public enum ConnectionType: String, CaseIterable {
-        case wifi = "WiFi"
-        case cellular = "Cellular"
-        case ethernet = "Ethernet"
-        case unknown = "Unknown"
-
-        public var icon: String {
-            switch self {
-            case .wifi: return "wifi"
-            case .cellular: return "antenna.radiowaves.left.and.right"
-            case .ethernet: return "cable.connector"
-            case .unknown: return "questionmark.circle"
-            }
-        }
-    }
 
     public init() {
         monitor.pathUpdateHandler = { [weak self] path in

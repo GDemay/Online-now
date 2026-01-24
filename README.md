@@ -1,103 +1,236 @@
-# Online Now
+# OnlineNow - Connectivity Intelligence SDK
 
-An iOS app that checks in real-time if you have an internet connection or not.
+A production-ready Swift SDK for real-time connectivity monitoring, captive portal detection, and network resiliency. Built for high-stakes applications like Fintech, E-commerce, and SaaS platforms.
 
-## Features
+[![Swift 5.9+](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
+[![iOS 15.0+](https://img.shields.io/badge/iOS-15.0+-blue.svg)](https://developer.apple.com/ios/)
+[![macOS 12.0+](https://img.shields.io/badge/macOS-12.0+-blue.svg)](https://developer.apple.com/macos/)
+[![watchOS 8.0+](https://img.shields.io/badge/watchOS-8.0+-blue.svg)](https://developer.apple.com/watchos/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-- **Real-time connectivity monitoring**: Instantly detects changes in internet connectivity
-- **Visual feedback**: Clear visual indicators with color-coded status (green for online, red for offline)
-- **Connection type detection**: Shows whether you're connected via WiFi, Cellular, or Ethernet
-- **SwiftUI interface**: Modern, clean user interface built with SwiftUI
-- **Network framework**: Uses Apple's native Network framework for reliable connectivity detection
+## 🚀 Why OnlineNow?
 
-## Requirements
+Most connectivity libraries only check if a network interface is up. OnlineNow goes further by detecting the **"Gray Zone"**—scenarios where the OS reports WiFi connected, but you're behind a captive portal (hotel WiFi) or on a degraded link that can't pass data.
 
-- iOS 15.0 or later
-- Xcode 13.0 or later
-- Swift 5.9 or later
+### Commercial Benefits
 
-## Installation
+- **Reduced Churn**: Prevent users from clicking "Pay" when the connection is unstable
+- **Improved UX**: Drop-in, Netflix-style connectivity banners that require zero design work
+- **Operational Safety**: Automatic retry with idempotency hooks to prevent duplicate requests during reconnection
 
-### Using Swift Package Manager
+## ✨ Features
 
-Add the package to your Xcode project:
+| Feature | Description |
+|---------|-------------|
+| 🔍 **True Reachability** | Validates actual internet connectivity, not just interface status |
+| 🏨 **Captive Portal Detection** | Detects hotel WiFi, airport portals, and corporate firewalls |
+| 📊 **Network Metadata** | Exposes `isExpensive`, `isConstrained`, and VPN/Proxy detection |
+| 🔄 **Automatic Retry** | `NetworkRetry` wrapper with exponential backoff and connectivity awareness |
+| 🧪 **Mocking Support** | `MockNetworkMonitor` for SwiftUI Previews and Unit Tests |
+| 📱 **Drop-in UI** | Connectivity banner ViewModifier with haptic feedback |
+| 🔒 **App Store Ready** | Includes `PrivacyInfo.xcprivacy` for 2024/2025 compliance |
+| 🌐 **Multi-Platform** | Supports iOS, macOS, watchOS, and tvOS |
 
-1. In Xcode, select File → Add Packages...
-2. Enter the repository URL
-3. Select the version you want to use
+## 📦 Installation
 
-Or add it to your `Package.swift`:
+### Swift Package Manager
+
+Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/GDemay/Online-now.git", from: "1.0.0")
+    .package(url: "https://github.com/GDemay/Online-now.git", from: "2.0.0")
 ]
 ```
 
-## Usage
+Or in Xcode: **File → Add Packages...** and enter the repository URL.
 
-### As a standalone app
+## 🎯 Quick Start
 
-The app can be built and run directly in Xcode. Simply open the project and run it on a simulator or device.
-
-### As a library
-
-You can use the `NetworkMonitor` class in your own iOS projects:
-
-```swift
-import OnlineNow
-
-class MyViewController: UIViewController {
-    private let networkMonitor = NetworkMonitor()
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        
-        networkMonitor.start()
-        
-        // Observe connectivity changes
-        networkMonitor.$isConnected
-            .sink { isConnected in
-                print("Internet connection: \(isConnected ? "Online" : "Offline")")
-            }
-            .store(in: &cancellables)
-    }
-    
-    deinit {
-        networkMonitor.stop()
-    }
-}
-```
-
-Or use the SwiftUI view directly:
+### 1. Add Connectivity Banner (Zero-Config)
 
 ```swift
 import SwiftUI
 import OnlineNow
 
-struct ContentView: View {
-    var body: some View {
-        ConnectivityStatusView()
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .connectivityBanner()  // Netflix-style banner
+        }
     }
 }
 ```
 
-## How It Works
+### 2. Use Resilient Network Requests
 
-The app uses Apple's `Network` framework to monitor network path updates. The `NetworkMonitor` class:
+```swift
+import OnlineNow
 
-1. Creates an `NWPathMonitor` instance
-2. Monitors path updates on a background queue
-3. Updates published properties on the main queue when connectivity changes
-4. Detects the type of connection (WiFi, Cellular, Ethernet)
+let retry = NetworkRetry()
 
-The UI automatically updates when connectivity status changes, providing instant visual feedback to the user.
+let result = await retry.execute(
+    description: "Process payment",
+    configuration: .critical  // 5 retries, 5-minute timeout
+) {
+    try await paymentAPI.processTransaction(amount: 99.99)
+}
 
-## Testing
+switch result {
+case .success(let receipt):
+    showSuccessScreen(receipt)
+case .failure(let error):
+    showError(error.localizedDescription)
+}
+```
 
-To test the app's connectivity detection:
+### 3. Check Connectivity Status
 
-1. Run the app on a physical device or simulator
+```swift
+import OnlineNow
+
+let reachability = ReachabilityService()
+let (status, captivePortal) = await reachability.checkConnectivity()
+
+if captivePortal.isCaptivePortal {
+    // Show "Login to WiFi" prompt
+    if let portalURL = captivePortal.portalURL {
+        openSafari(portalURL)
+    }
+} else if status.isReachable {
+    // Proceed with network operations
+} else {
+    // Show offline state
+}
+```
+
+### 4. Monitor Real-Time Status
+
+```swift
+import OnlineNow
+import Combine
+
+class NetworkStatusManager: ObservableObject {
+    private let monitor = NetworkMonitor()
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        monitor.start()
+
+        monitor.$isConnected
+            .combineLatest(monitor.$connectionType)
+            .sink { [weak self] isConnected, type in
+                print("Status: \(isConnected ? "Online" : "Offline") via \(type.rawValue)")
+            }
+            .store(in: &cancellables)
+    }
+}
+```
+
+## 🧪 Testing & Previews
+
+Use `MockNetworkMonitor` to simulate network conditions:
+
+```swift
+import SwiftUI
+import OnlineNow
+
+struct PaymentView_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            PaymentView()
+                .mockNetworkScenario(.connected)
+                .previewDisplayName("Connected")
+
+            PaymentView()
+                .mockNetworkScenario(.captivePortal)
+                .previewDisplayName("Captive Portal")
+
+            PaymentView()
+                .mockNetworkScenario(.disconnected)
+                .previewDisplayName("Offline")
+        }
+    }
+}
+```
+
+Available scenarios:
+- `.connected` - Full connectivity (WiFi)
+- `.disconnected` - No network
+- `.captivePortal` - Behind login portal
+- `.slowConnection` - High latency, low speed
+- `.unstable` - Intermittent drops
+- `.cellularExpensive` - Metered connection
+- `.vpnActive` - VPN tunnel active
+- `.lowDataMode` - Constrained bandwidth
+
+## 📖 API Reference
+
+### Core Types
+
+| Type | Description |
+|------|-------------|
+| `ConnectivityStatus` | `.connected`, `.disconnected`, `.captivePortal`, `.localOnly`, `.checking` |
+| `NetworkMetadata` | Connection details including `isExpensive`, `isConstrained`, `isUsingTunnel` |
+| `SignalQuality` | `.excellent`, `.good`, `.fair`, `.poor`, `.unknown` |
+
+### Services
+
+| Service | Description |
+|---------|-------------|
+| `NetworkMonitor` | Real-time NWPathMonitor wrapper with VPN detection |
+| `ReachabilityService` | True reachability + captive portal detection |
+| `NetworkRetry` | Resilient operation wrapper with exponential backoff |
+
+### UI Components
+
+| Component | Description |
+|-----------|-------------|
+| `.connectivityBanner()` | Drop-in status bar overlay |
+| `.netflixConnectivityBanner()` | Netflix-style bottom banner |
+| `.minimalConnectivityBanner()` | Shows only disconnected state |
+
+### Configuration
+
+```swift
+// Retry configurations
+NetworkRetryConfiguration.quick      // 2 retries, 30s timeout
+NetworkRetryConfiguration.critical   // 5 retries, 5min timeout
+NetworkRetryConfiguration.background // 10 retries, no timeout
+
+// Banner configurations
+ConnectivityBannerConfiguration.default     // Top, show problems
+ConnectivityBannerConfiguration.netflixStyle // Bottom, auto-dismiss
+ConnectivityBannerConfiguration.verbose      // Always visible
+```
+
+## 🔐 Privacy & Compliance
+
+OnlineNow includes a `PrivacyInfo.xcprivacy` manifest declaring:
+- **No user data collection** - Only monitors device connectivity
+- **No tracking** - No tracking domains or fingerprinting
+- **Required Reason APIs** - Properly declared for App Store review
+
+## 📋 Requirements
+
+| Platform | Minimum Version |
+|----------|-----------------|
+| iOS | 15.0+ |
+| macOS | 12.0+ |
+| watchOS | 8.0+ |
+| tvOS | 15.0+ |
+| Swift | 5.9+ |
+| Xcode | 15.0+ |
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our contributing guidelines before submitting PRs.
 2. Toggle airplane mode on/off
 3. Switch between WiFi and cellular data
 4. Observe the real-time status updates

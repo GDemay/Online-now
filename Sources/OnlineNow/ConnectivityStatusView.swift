@@ -3,7 +3,8 @@ import SwiftData
 
 /// Premium main view with top-tier iOS design
 /// Displays current network connectivity status with all features
-@available(iOS 17.0, *)
+/// Note: Requires iOS 17+ for SwiftData integration. For iOS 15+ use ConnectivityBanner.
+@available(iOS 17.0, macOS 14.0, *)
 public struct ConnectivityStatusView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
