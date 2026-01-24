@@ -1,0 +1,21 @@
+name: OnlineNow
+options:
+  bundleIdPrefix: com.gdemay
+  deploymentTarget:
+    iOS: 15.0
+targets:
+  OnlineNow:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Sources/OnlineNow
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Online Now
+        UILaunchScreen: {}
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.gdemay.onlinenow
+      SWIFT_VERSION: 5.0
+      TARGETED_DEVICE_FAMILY: "1,2"
