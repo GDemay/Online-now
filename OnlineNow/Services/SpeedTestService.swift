@@ -8,7 +8,7 @@
 import Foundation
 
 class SpeedTestService: ObservableObject {
-    // Test file size in bytes (500 KB for minimal data usage)
+    // Test file size in bytes (512 KB for minimal data usage)
     private let testFileSize: Double = 512_000
     
     // URL for speed test - using a reliable CDN endpoint
