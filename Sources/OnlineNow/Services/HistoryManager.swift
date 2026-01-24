@@ -2,7 +2,8 @@ import Foundation
 import SwiftData
 
 /// Manages the local history of connectivity checks using SwiftData
-@available(iOS 17.0, *)
+/// Note: Requires iOS 17+ for SwiftData. Core SDK features work on iOS 15+.
+@available(iOS 17.0, macOS 14.0, *)
 @MainActor
 public final class HistoryManager: ObservableObject {
 

@@ -2,7 +2,8 @@ import SwiftUI
 import Charts
 
 /// Enum for different stat types
-@available(iOS 17.0, *)
+/// Note: Requires iOS 17+ for Charts and SwiftData integration
+@available(iOS 17.0, macOS 14.0, *)
 public enum StatType: String, CaseIterable, Identifiable {
     case speed = "Speed"
     case latency = "Latency"

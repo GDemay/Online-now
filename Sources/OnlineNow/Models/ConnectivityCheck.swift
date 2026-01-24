@@ -2,7 +2,8 @@ import Foundation
 import SwiftData
 
 /// Represents a single connectivity check record stored locally
-@available(iOS 17.0, *)
+/// Note: Requires iOS 17+ for SwiftData @Model. Core SDK works on iOS 15+.
+@available(iOS 17.0, macOS 14.0, *)
 @Model
 public final class ConnectivityCheck {
     /// Unique identifier for the check
@@ -56,7 +57,8 @@ public final class ConnectivityCheck {
 }
 
 /// Connection type enumeration for type safety
-public enum ConnectionType: String, Codable, CaseIterable {
+/// Sendable-conformant for safe use across concurrency domains
+public enum ConnectionType: String, Codable, CaseIterable, Sendable {
     case wifi = "WiFi"
     case cellular = "Cellular"
     case ethernet = "Ethernet"
@@ -75,5 +77,25 @@ public enum ConnectionType: String, Codable, CaseIterable {
 
     public var displayName: String {
         return rawValue
+    }
+
+    /// Whether this connection type has any network interface
+    public var hasInterface: Bool {
+        switch self {
+        case .wifi, .cellular, .ethernet:
+            return true
+        case .unknown, .none:
+            return false
+        }
+    }
+
+    /// Whether this is a wireless connection
+    public var isWireless: Bool {
+        switch self {
+        case .wifi, .cellular:
+            return true
+        case .ethernet, .unknown, .none:
+            return false
+        }
     }
 }

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Custom logo view that recreates the Online Now logo
 /// Ring with checkmark and glowing green center dot
-@available(iOS 17.0, *)
+@available(iOS 15.0, macOS 12.0, watchOS 8.0, *)
 public struct LogoView: View {
     let size: CGFloat
     let isAnimating: Bool
@@ -167,6 +167,7 @@ public struct LoadingRingView: View {
     }
 }
 
+#if os(iOS)
 @available(iOS 17.0, *)
 #Preview {
     VStack(spacing: 40) {
@@ -177,3 +178,4 @@ public struct LoadingRingView: View {
     .padding()
     .background(Color(.systemBackground))
 }
+#endif

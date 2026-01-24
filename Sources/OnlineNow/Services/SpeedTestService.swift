@@ -2,7 +2,7 @@ import Foundation
 
 /// Service to measure download speed accurately
 /// Uses streaming download with larger files for reliable measurements
-@available(iOS 17.0, *)
+@available(iOS 15.0, macOS 12.0, watchOS 8.0, *)
 public actor SpeedTestService {
 
     /// Test file sizes for different test modes

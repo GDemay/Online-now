@@ -1,9 +1,11 @@
+import Combine
 import Foundation
-import SwiftUI
 import Network
+import SwiftUI
 
 /// Unified view model for managing all connectivity-related state
-@available(iOS 17.0, *)
+/// Note: Requires iOS 17+ for SwiftData integration
+@available(iOS 17.0, macOS 14.0, *)
 @MainActor
 public final class ConnectivityViewModel: ObservableObject {
 
@@ -92,14 +94,16 @@ public final class ConnectivityViewModel: ObservableObject {
         }
 
         // Reachability check every 10 seconds (reduced frequency to save data)
-        reachabilityTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+        reachabilityTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) {
+            [weak self] _ in
             Task { @MainActor [weak self] in
                 await self?.performRealtimeCheck()
             }
         }
 
         // Speed test every 2 minutes (reduced frequency to save data - uses ~10KB per test)
-        speedTestTimer = Timer.scheduledTimer(withTimeInterval: 120.0, repeats: true) { [weak self] _ in
+        speedTestTimer = Timer.scheduledTimer(withTimeInterval: 120.0, repeats: true) {
+            [weak self] _ in
             Task { @MainActor [weak self] in
                 await self?.performBackgroundSpeedTest()
             }
@@ -145,10 +149,12 @@ public final class ConnectivityViewModel: ObservableObject {
         // Only check additional endpoints if main reachability succeeded
         if isReachable {
             // Check Google reachability (lightweight HEAD request would be better but this works)
-            isGoogleReachable = await checkEndpointReachable(urlString: "https://www.google.com/generate_204")
+            isGoogleReachable = await checkEndpointReachable(
+                urlString: "https://www.google.com/generate_204")
 
             // Check Cloudflare reachability - using their DNS check endpoint
-            isCloudflareReachable = await checkEndpointReachable(urlString: "https://cloudflare.com/cdn-cgi/trace")
+            isCloudflareReachable = await checkEndpointReachable(
+                urlString: "https://cloudflare.com/cdn-cgi/trace")
         } else {
             isGoogleReachable = false
             isCloudflareReachable = false
@@ -225,14 +231,14 @@ public final class ConnectivityViewModel: ObservableObject {
         let latencyScore: Int
         if let latency = latencyMs {
             switch latency {
-            case 0..<20: latencyScore = 4    // Excellent
-            case 20..<50: latencyScore = 3   // Good
+            case 0..<20: latencyScore = 4  // Excellent
+            case 20..<50: latencyScore = 3  // Good
             case 50..<100: latencyScore = 2  // Fair
-            case 100..<200: latencyScore = 1 // Acceptable
-            default: latencyScore = 0         // Poor
+            case 100..<200: latencyScore = 1  // Acceptable
+            default: latencyScore = 0  // Poor
             }
         } else {
-            latencyScore = 2 // Default to fair if no latency data
+            latencyScore = 2  // Default to fair if no latency data
         }
 
         // Calculate speed score (0-4 points)
@@ -240,11 +246,11 @@ public final class ConnectivityViewModel: ObservableObject {
         let speedScore: Int
         if let speed = speedResult?.speedMbps {
             switch speed {
-            case 50...: speedScore = 4       // Excellent
-            case 25..<50: speedScore = 3     // Good
-            case 10..<25: speedScore = 2     // Fair
-            case 5..<10: speedScore = 1      // Acceptable
-            default: speedScore = 0           // Poor
+            case 50...: speedScore = 4  // Excellent
+            case 25..<50: speedScore = 3  // Good
+            case 10..<25: speedScore = 2  // Fair
+            case 5..<10: speedScore = 1  // Acceptable
+            default: speedScore = 0  // Poor
             }
         } else {
             // If no speed test yet, base quality purely on latency
@@ -366,7 +372,7 @@ public final class ConnectivityViewModel: ObservableObject {
             networkMonitor.$connectionType
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] type in
-                    self?.connectionType = ConnectionType(from: type)
+                    self?.connectionType = type
                     self?.updateState()
                 }
                 .store(in: &cancellables)
@@ -384,7 +390,7 @@ public final class ConnectivityViewModel: ObservableObject {
 
     private func syncWithNetworkMonitor() {
         isConnected = networkMonitor.isConnected
-        connectionType = ConnectionType(from: networkMonitor.connectionType)
+        connectionType = networkMonitor.connectionType
         isVPNActive = networkMonitor.isVPNActive
         updateState()
 
@@ -405,7 +411,7 @@ public final class ConnectivityViewModel: ObservableObject {
 
     private func updateState() {
         if state == .checking || state == .measuringSpeed {
-            return // Don't interrupt active operations
+            return  // Don't interrupt active operations
         }
 
         if !isConnected {
@@ -506,27 +512,7 @@ public enum AppState: Equatable {
     }
 }
 
-// MARK: - ConnectionType Extension
-
-@available(iOS 17.0, *)
-extension ConnectionType {
-    init(from monitorType: NetworkMonitor.ConnectionType) {
-        switch monitorType {
-        case .wifi:
-            self = .wifi
-        case .cellular:
-            self = .cellular
-        case .ethernet:
-            self = .ethernet
-        case .unknown:
-            self = .unknown
-        }
-    }
-}
-
 // MARK: - Combine Import
-
-import Combine
 
 // MARK: - AnyCancellable
 

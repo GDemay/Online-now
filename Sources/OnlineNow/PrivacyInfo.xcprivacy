@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Privacy Nutrition Labels -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <!-- No user data is collected - library only monitors device connectivity -->
+    </array>
+
+    <!-- Privacy Tracking -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <!-- Tracking Domains - None used -->
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- Required Reason APIs -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <!-- Network Information APIs -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- Used for timing network operations and calculating latency -->
+                <string>35F9.1</string>
+            </array>
+        </dict>
+
+        <!-- Disk Space APIs (if used for caching) -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- Check available storage for history caching -->
+                <string>E174.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
