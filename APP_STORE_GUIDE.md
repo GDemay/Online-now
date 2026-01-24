@@ -50,7 +50,7 @@ Complete support for Dynamic Type, VoiceOver, and native iOS design. Respects sy
 • Not a background monitoring tool
 • Not a data-hungry analytics app
 
-It does one thing well: tell you if you're online and how good that connection is — with history.
+It focuses on one clear goal — helping you understand your connection — by telling you if you're online, how good that connection is, and keeping a private history.
 
 **PRIVACY FIRST**
 
