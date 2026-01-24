@@ -130,6 +130,9 @@ public final class ConnectivityViewModel: ObservableObject {
         isPerformingCheck = true
         defer { isPerformingCheck = false }
 
+        // Debug: Log network monitor state
+        print("🔍 NetworkMonitor state - isConnected: \(isConnected), type: \(connectionType)")
+
         // Only check if network monitor says we're connected
         guard isConnected else {
             isReachable = false
@@ -141,10 +144,20 @@ public final class ConnectivityViewModel: ObservableObject {
         }
 
         // Check main reachability
+        print("🌐 Performing reachability check...")
         let reachabilityResult = await reachabilityService.checkReachability()
+        print(
+            "✅ Reachability result: \(reachabilityResult.isReachable), latency: \(reachabilityResult.latencyMs)ms, error: \(reachabilityResult.error ?? "none")"
+        )
+
         isReachable = reachabilityResult.isReachable
         latencyMs = reachabilityResult.latencyMs
         lastCheckTime = Date()
+
+        // If reachability check failed but network is connected, log error
+        if !reachabilityResult.isReachable {
+            errorMessage = reachabilityResult.error
+        }
 
         // Only check additional endpoints if main reachability succeeded
         if isReachable {
