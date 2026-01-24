@@ -2,7 +2,7 @@ import Foundation
 import Network
 
 /// A monitor that observes network connectivity status in real-time
-@available(iOS 12.0, *)
+@available(iOS 15.0, *)
 public class NetworkMonitor: ObservableObject {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "NetworkMonitor")

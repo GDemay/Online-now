@@ -17,5 +17,5 @@ targets:
         UILaunchScreen: {}
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.gdemay.onlinenow
-      SWIFT_VERSION: 5.0
+      SWIFT_VERSION: 5.9
       TARGETED_DEVICE_FAMILY: "1,2"
