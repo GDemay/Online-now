@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 /// Premium main view with top-tier iOS design
 /// Displays current network connectivity status with all features
@@ -81,6 +81,38 @@ public struct ConnectivityStatusView: View {
             .onDisappear {
                 viewModel.stopMonitoring()
             }
+            // Preview mode: triple-tap anywhere to toggle, tap to cycle states
+            .onTapGesture(count: 3) {
+                withAnimation(.spring(response: 0.3)) {
+                    viewModel.togglePreviewMode()
+                }
+            }
+            .onTapGesture(count: 1) {
+                if viewModel.isPreviewMode {
+                    withAnimation(.spring(response: 0.3)) {
+                        viewModel.cyclePreviewState()
+                    }
+                }
+            }
+            .overlay(alignment: .top) {
+                // Preview mode indicator
+                if viewModel.isPreviewMode {
+                    PreviewModeBanner(
+                        currentState: viewModel.previewState,
+                        onCycleState: {
+                            withAnimation(.spring(response: 0.3)) {
+                                viewModel.cyclePreviewState()
+                            }
+                        },
+                        onExitPreview: {
+                            withAnimation(.spring(response: 0.3)) {
+                                viewModel.togglePreviewMode()
+                            }
+                        }
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
         }
     }
 
@@ -121,7 +153,7 @@ public struct ConnectivityStatusView: View {
             LinearGradient(
                 colors: [
                     statusBackgroundColor.opacity(0.15),
-                    Color(.systemBackground)
+                    Color(.systemBackground),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -151,7 +183,9 @@ public struct ConnectivityStatusView: View {
         VStack(spacing: 16) {
             // Logo
             ZStack {
-                if viewModel.state == .checking || viewModel.state == .measuringSpeed || viewModel.state == .idle {
+                if viewModel.state == .checking || viewModel.state == .measuringSpeed
+                    || viewModel.state == .idle
+                {
                     LoadingRingView(size: min(geometry.size.width * 0.65, 280))
                 } else {
                     LogoView(
@@ -213,7 +247,8 @@ public struct ConnectivityStatusView: View {
             if let lastCheck = viewModel.lastCheckTime {
                 let formatter = RelativeDateTimeFormatter()
                 formatter.unitsStyle = .abbreviated
-                subtitle += " • Updated \(formatter.localizedString(for: lastCheck, relativeTo: Date()))"
+                subtitle +=
+                    " • Updated \(formatter.localizedString(for: lastCheck, relativeTo: Date()))"
             }
             return subtitle
         case .offline: return "No internet connection detected"
@@ -246,10 +281,14 @@ public struct ConnectivityStatusView: View {
                 // Speed card - tappable
                 MiniStatCard(
                     title: "Speed",
-                    value: viewModel.speedResult?.speedMbps != nil ? String(format: viewModel.speedResult!.speedMbps! < 10 ? "%.1f" : "%.0f", viewModel.speedResult!.speedMbps!) : "—",
+                    value: viewModel.speedResult?.speedMbps != nil
+                        ? String(
+                            format: viewModel.speedResult!.speedMbps! < 10 ? "%.1f" : "%.0f",
+                            viewModel.speedResult!.speedMbps!) : "—",
                     unit: viewModel.speedResult?.speedMbps != nil ? "Mbps" : "",
                     icon: "arrow.down.circle.fill",
-                    color: viewModel.speedResult?.speedMbps != nil ? speedColor(viewModel.speedResult!.speedMbps!) : .gray,
+                    color: viewModel.speedResult?.speedMbps != nil
+                        ? speedColor(viewModel.speedResult!.speedMbps!) : .gray,
                     showChevron: true
                 )
                 .onTapGesture {
@@ -259,7 +298,8 @@ public struct ConnectivityStatusView: View {
                 // Latency card - tappable
                 MiniStatCard(
                     title: "Latency",
-                    value: viewModel.latencyMs != nil ? String(format: "%.0f", viewModel.latencyMs!) : "—",
+                    value: viewModel.latencyMs != nil
+                        ? String(format: "%.0f", viewModel.latencyMs!) : "—",
                     unit: viewModel.latencyMs != nil ? "ms" : "",
                     icon: "clock.fill",
                     color: viewModel.latencyMs != nil ? latencyColor(viewModel.latencyMs!) : .gray,
@@ -351,12 +391,17 @@ public struct ConnectivityStatusView: View {
                 // Status indicator
                 ZStack {
                     Circle()
-                        .fill(check.isReachable ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
+                        .fill(
+                            check.isReachable ? Color.green.opacity(0.15) : Color.red.opacity(0.15)
+                        )
                         .frame(width: 44, height: 44)
 
-                    Image(systemName: check.isReachable ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(check.isReachable ? .green : .red)
+                    Image(
+                        systemName: check.isReachable
+                            ? "checkmark.circle.fill" : "xmark.circle.fill"
+                    )
+                    .font(.system(size: 22))
+                    .foregroundStyle(check.isReachable ? .green : .red)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -400,7 +445,9 @@ public struct ConnectivityStatusView: View {
             showHistory = true
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Recent activity: \(check.isReachable ? "Online" : "Offline"), \(viewModel.historyManager.timeSinceLastCheck() ?? "")")
+        .accessibilityLabel(
+            "Recent activity: \(check.isReachable ? "Online" : "Offline"), \(viewModel.historyManager.timeSinceLastCheck() ?? "")"
+        )
         .accessibilityHint("Tap to view full history")
     }
 
@@ -614,7 +661,65 @@ struct MiniStatCard: View {
             }
         )
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .contentShape(Rectangle()) // Make entire card tappable
+        .contentShape(Rectangle())  // Make entire card tappable
+    }
+}
+
+// MARK: - Preview Mode Banner
+
+/// Banner shown at top when in preview/screenshot mode
+@available(iOS 17.0, macOS 14.0, *)
+struct PreviewModeBanner: View {
+    let currentState: AppState
+    let onCycleState: () -> Void
+    let onExitPreview: () -> Void
+
+    private var stateLabel: String {
+        switch currentState {
+        case .online: return "🟢 Online"
+        case .offline: return "🔴 Offline"
+        case .limitedConnectivity: return "🟠 Limited"
+        case .checking: return "🔵 Checking"
+        case .measuringSpeed: return "🔵 Speed Test"
+        default: return "Preview"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "camera.fill")
+                .font(.system(size: 14, weight: .semibold))
+
+            Text("SCREENSHOT MODE")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+
+            Spacer()
+
+            // Current state indicator
+            Button(action: onCycleState) {
+                Text(stateLabel)
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(.white.opacity(0.2), in: Capsule())
+            }
+
+            Button(action: onExitPreview) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18))
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            LinearGradient(
+                colors: [.purple, .blue],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .shadow(color: .purple.opacity(0.3), radius: 8, x: 0, y: 4)
     }
 }
 

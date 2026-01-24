@@ -9,6 +9,96 @@ import SwiftUI
 @MainActor
 public final class ConnectivityViewModel: ObservableObject {
 
+    // MARK: - Screenshot/Preview Mode
+
+    /// Enable preview mode for taking screenshots (shake device or triple-tap to toggle)
+    @Published public var isPreviewMode: Bool = false
+
+    /// Simulated state for preview mode
+    @Published public var previewState: AppState = .online
+
+    /// Toggle between preview states for screenshots
+    public func cyclePreviewState() {
+        let states: [AppState] = [
+            .online, .offline, .limitedConnectivity, .checking, .measuringSpeed,
+        ]
+        if let currentIndex = states.firstIndex(of: previewState) {
+            let nextIndex = (currentIndex + 1) % states.count
+            previewState = states[nextIndex]
+        } else {
+            previewState = .online
+        }
+
+        // Update displayed values based on preview state
+        if isPreviewMode {
+            applyPreviewState()
+        }
+    }
+
+    /// Apply preview state values for screenshots
+    private func applyPreviewState() {
+        switch previewState {
+        case .online:
+            state = .online
+            isConnected = true
+            isReachable = true
+            connectionType = .wifi
+            latencyMs = 23
+            speedResult = SpeedTestResult(
+                speedMbps: 156.8, bytesDownloaded: 19_660_800, durationSeconds: 1.0, error: nil)
+            signalQuality = "Excellent"
+            isVPNActive = false
+            errorMessage = nil
+        case .offline:
+            state = .offline
+            isConnected = false
+            isReachable = false
+            connectionType = .none
+            latencyMs = nil
+            speedResult = nil
+            signalQuality = "No Signal"
+            isVPNActive = false
+            errorMessage = nil
+        case .limitedConnectivity:
+            state = .limitedConnectivity
+            isConnected = true
+            isReachable = false
+            connectionType = .wifi
+            latencyMs = 450
+            speedResult = SpeedTestResult(
+                speedMbps: 2.1, bytesDownloaded: 262_144, durationSeconds: 1.0, error: nil)
+            signalQuality = "Poor"
+            isVPNActive = false
+            errorMessage = "Internet unreachable"
+        case .checking:
+            state = .checking
+            isConnected = true
+            connectionType = .wifi
+        case .measuringSpeed:
+            state = .measuringSpeed
+            isConnected = true
+            isReachable = true
+            connectionType = .wifi
+        default:
+            break
+        }
+    }
+
+    /// Toggle preview mode on/off
+    public func togglePreviewMode() {
+        isPreviewMode.toggle()
+        if isPreviewMode {
+            // Stop real monitoring
+            stopMonitoring()
+            applyPreviewState()
+            print("📸 PREVIEW MODE ON - Tap screen to cycle states, shake to exit")
+        } else {
+            // Resume real monitoring
+            startMonitoring()
+            print("📸 PREVIEW MODE OFF - Resuming real network monitoring")
+        }
+    }
+
     // MARK: - Published State
 
     /// Current app state
