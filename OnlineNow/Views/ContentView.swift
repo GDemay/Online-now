@@ -226,6 +226,7 @@ struct ContentView: View {
     
     // MARK: - Actions
     
+    @MainActor
     private func performCheck() {
         Task {
             isChecking = true
