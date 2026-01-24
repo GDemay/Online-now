@@ -14,15 +14,28 @@ class SpeedTestService: ObservableObject {
     // URL for speed test - using a reliable CDN endpoint
     private let testURL = "https://httpbin.org/bytes/512000"
     
+    // Speed confidence thresholds in Mbps
+    private let verySlowThreshold = 1.0      // < 1 Mbps: Very slow (unusable for most tasks)
+    private let slowThreshold = 5.0          // 1-5 Mbps: Slow (basic browsing only)
+    private let moderateThreshold = 25.0     // 5-25 Mbps: Moderate (HD streaming, video calls)
+    private let goodThreshold = 100.0        // 25-100 Mbps: Good (multiple HD streams, gaming)
+                                             // > 100 Mbps: Excellent (ultra HD, heavy usage)
+    
     func measureSpeed() async -> Double? {
         guard let url = URL(string: testURL) else {
             return nil
         }
         
+        // Configure URLSession with explicit timeouts for better UX
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 15.0  // 15 seconds for request timeout
+        configuration.timeoutIntervalForResource = 30.0  // 30 seconds for resource timeout
+        let session = URLSession(configuration: configuration)
+        
         let startTime = Date()
         
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await session.data(from: url)
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
@@ -41,7 +54,8 @@ class SpeedTestService: ObservableObject {
             // Return reasonable speed (cap at 1000 Mbps to avoid outliers)
             return min(speedMbps, 1000.0)
         } catch {
-            print("Speed test error: \(error.localizedDescription)")
+            // Note: Error is not shown to user as speed measurement failure
+            // is communicated through the UI by returning nil
             return nil
         }
     }
@@ -51,14 +65,15 @@ class SpeedTestService: ObservableObject {
             return (nil, "Unable to measure speed")
         }
         
+        // Determine confidence level based on speed thresholds
         let confidence: String
-        if speed < 1.0 {
+        if speed < verySlowThreshold {
             confidence = "Very slow connection"
-        } else if speed < 5.0 {
+        } else if speed < slowThreshold {
             confidence = "Slow connection"
-        } else if speed < 25.0 {
+        } else if speed < moderateThreshold {
             confidence = "Moderate connection"
-        } else if speed < 100.0 {
+        } else if speed < goodThreshold {
             confidence = "Good connection"
         } else {
             confidence = "Excellent connection"

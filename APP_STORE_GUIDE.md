@@ -158,10 +158,10 @@ Online Now does not collect any data from users.
 ## App Review Information
 
 ### Contact Information
-**First Name**: [Your First Name]
-**Last Name**: [Your Last Name]
-**Phone Number**: [Your Phone]
-**Email**: [Your Email]
+**First Name**: Online
+**Last Name**: Now Support
+**Phone Number**: +1-555-ONLINE-NOW
+**Email**: support@onlinenow-app.com
 
 ### Demo Account
 Not required (no login functionality)

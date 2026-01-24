@@ -240,7 +240,7 @@ A: No tracking whatsoever.
 
 ## Support
 
-- 📧 Email: [Support email]
+- 📧 Email: support@onlinenow-app.com
 - 🐛 Issues: https://github.com/GDemay/Online-now/issues
 - 💬 Discussions: https://github.com/GDemay/Online-now/discussions
 

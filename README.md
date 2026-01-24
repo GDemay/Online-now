@@ -9,7 +9,7 @@ Online Now is a lightweight iOS app that tells you, instantly and reliably, whet
 - **Instant Internet Status**: Clearly indicates whether the device is currently online with real internet reachability checks
 - **Connection Type Detection**: Distinguishes between Wi-Fi, Cellular, and No Connection
 - **Reliable Speed Estimation**: Measures effective download speed with minimal data usage
-- **Automatic History Tracking**: Every check is automatically saved locally with timestamp and connection details
+- **History Tracking**: Every manual check is automatically saved locally with timestamp and connection details
 - **Recent Activity Overview**: Displays last check result and time since last measurement
 - **Private by Design**: All data stored only on your device - no accounts, tracking, or analytics
 - **Simple, Focused Interface**: Single, distraction-free screen with clear states

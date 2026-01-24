@@ -44,7 +44,9 @@ class HistoryManager: ObservableObject {
             let data = try encoder.encode(checkHistory)
             UserDefaults.standard.set(data, forKey: saveKey)
         } catch {
-            print("Failed to save history: \(error.localizedDescription)")
+            // Silently fail - UserDefaults write failures are rare and typically
+            // indicate system-level issues (storage full, etc.) that users cannot fix
+            // History will be lost for this session but app remains functional
         }
     }
     
@@ -58,7 +60,10 @@ class HistoryManager: ObservableObject {
             checkHistory = try decoder.decode([CheckResult].self, from: data)
             lastCheck = checkHistory.first
         } catch {
-            print("Failed to load history: \(error.localizedDescription)")
+            // Silently fail if history data is corrupted - start with empty history
+            // This can occur after app updates that change the data model
+            checkHistory = []
+            lastCheck = nil
         }
     }
     

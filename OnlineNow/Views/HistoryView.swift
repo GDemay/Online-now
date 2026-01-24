@@ -73,7 +73,7 @@ struct HistoryView: View {
                             Text("Recent Checks")
                         }
                     }
-                    .listStyle(InsetGroupedListStyle())
+                    .listStyle(.insetGrouped)
                 }
             }
             .navigationTitle("History")

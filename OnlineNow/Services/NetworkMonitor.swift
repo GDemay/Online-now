@@ -11,7 +11,6 @@ import Combine
 
 @MainActor
 class NetworkMonitor: ObservableObject {
-    @Published var connectionState: ConnectionState = .checking
     @Published var currentConnectionType: ConnectionType = .unknown
     @Published var isConnected: Bool = false
     

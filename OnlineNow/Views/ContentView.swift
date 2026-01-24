@@ -235,46 +235,40 @@ struct ContentView: View {
             // Check connection
             let result = await networkMonitor.checkConnection()
             
-            await MainActor.run {
-                isChecking = false
+            isChecking = false
+            
+            if result.isOnline {
+                statusMessage = result.connectionType.rawValue
                 
-                if result.isOnline {
-                    statusMessage = result.connectionType.rawValue
-                    
-                    // Measure speed
-                    Task {
-                        isMeasuringSpeed = true
-                        statusMessage = "Testing speed..."
-                        
-                        let speedResult = await speedTestService.measureSpeedWithConfidence()
-                        
-                        await MainActor.run {
-                            isMeasuringSpeed = false
-                            currentSpeed = speedResult.speed
-                            speedConfidence = speedResult.confidence
-                            
-                            // Save to history
-                            let checkResult = CheckResult(
-                                connectionType: result.connectionType,
-                                isOnline: result.isOnline,
-                                speedMbps: speedResult.speed
-                            )
-                            historyManager.saveCheck(checkResult)
-                            
-                            statusMessage = result.connectionType.rawValue
-                        }
-                    }
-                } else {
-                    statusMessage = "No internet connection"
-                    
-                    // Save offline check to history
-                    let checkResult = CheckResult(
-                        connectionType: result.connectionType,
-                        isOnline: result.isOnline,
-                        speedMbps: nil
-                    )
-                    historyManager.saveCheck(checkResult)
-                }
+                // Measure speed
+                isMeasuringSpeed = true
+                statusMessage = "Testing speed..."
+                
+                let speedResult = await speedTestService.measureSpeedWithConfidence()
+                
+                isMeasuringSpeed = false
+                currentSpeed = speedResult.speed
+                speedConfidence = speedResult.confidence
+                
+                // Save to history
+                let checkResult = CheckResult(
+                    connectionType: result.connectionType,
+                    isOnline: result.isOnline,
+                    speedMbps: speedResult.speed
+                )
+                historyManager.saveCheck(checkResult)
+                
+                statusMessage = result.connectionType.rawValue
+            } else {
+                statusMessage = "No internet connection"
+                
+                // Save offline check to history
+                let checkResult = CheckResult(
+                    connectionType: result.connectionType,
+                    isOnline: result.isOnline,
+                    speedMbps: nil
+                )
+                historyManager.saveCheck(checkResult)
             }
         }
     }
