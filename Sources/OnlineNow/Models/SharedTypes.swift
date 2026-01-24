@@ -74,23 +74,3 @@ public enum SpeedCategory: String, Sendable {
         }
     }
 }
-
-/// Application state for connectivity monitoring
-public enum AppState: String, Sendable {
-    case idle = "Idle"
-    case checking = "Checking"
-    case measuringSpeed = "Measuring Speed"
-    case online = "Online"
-    case offline = "Offline"
-    case limitedConnectivity = "Limited"
-
-    /// Whether the state indicates active network availability
-    public var isOnline: Bool {
-        switch self {
-        case .online, .limitedConnectivity:
-            return true
-        case .idle, .checking, .measuringSpeed, .offline:
-            return false
-        }
-    }
-}

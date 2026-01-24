@@ -1,0 +1,15 @@
+# GitHub Pages Configuration for Online Now
+title: Online Now
+description: Your Essential Network Connectivity Companion for iOS
+baseurl: ""
+url: "https://gdemay.github.io/Online-now"
+
+# Theme (optional - we use custom HTML)
+# theme: jekyll-theme-minimal
+
+# Exclude files from build
+exclude:
+  - README.md
+  - LICENSE
+  - Gemfile
+  - Gemfile.lock

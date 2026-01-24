@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support - Online Now</title>
+    <meta name="description" content="Get help and support for the Online Now iOS application">
+    <style>
+        :root {
+            --primary: #3A9BF9;
+            --secondary: #66B3FA;
+            --success: #34C759;
+            --dark: #1C1C1E;
+            --light: #F2F2F7;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.8;
+            color: var(--dark);
+            background: var(--light);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: var(--primary);
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .content {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            font-size: 1.3rem;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: var(--dark);
+        }
+
+        h2:first-child {
+            margin-top: 0;
+        }
+
+        p {
+            margin-bottom: 15px;
+            color: #444;
+        }
+
+        .faq-item {
+            margin-bottom: 25px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .faq-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+
+        .faq-question {
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 10px;
+            font-size: 1.05rem;
+        }
+
+        .faq-answer {
+            color: #555;
+        }
+
+        .contact-card {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .contact-card h2 {
+            color: white;
+            margin-top: 0;
+        }
+
+        .contact-card p {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .contact-button {
+            display: inline-block;
+            background: white;
+            color: var(--primary);
+            padding: 14px 32px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .contact-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .requirements {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .requirements h3 {
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        .requirements ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .requirements li {
+            padding: 5px 0;
+            color: #555;
+        }
+
+        .requirements li::before {
+            content: "✓ ";
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 30px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 600px) {
+            .content, .contact-card {
+                padding: 24px;
+            }
+
+            h1 {
+                font-size: 1.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Support</h1>
+            <p class="subtitle">We're here to help you get the most out of Online Now</p>
+        </header>
+
+        <div class="content">
+            <h2>Frequently Asked Questions</h2>
+
+            <div class="faq-item">
+                <p class="faq-question">Why does the app show "Offline" when I have WiFi connected?</p>
+                <p class="faq-answer">Online Now checks for actual internet connectivity, not just network connection. You may be connected to WiFi but behind a captive portal (like hotel WiFi that requires login) or the WiFi may not have internet access. Try opening a web browser to verify your connection.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">How accurate is the speed test?</p>
+                <p class="faq-answer">The speed test provides a general indication of your download speed. For the most accurate results, close other apps and ensure you're not actively downloading or streaming content. Results may vary based on server distance and current network conditions.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">Does the app use a lot of battery?</p>
+                <p class="faq-answer">No. Online Now uses Apple's efficient Network framework which is optimized for minimal battery consumption. The app only actively monitors when in the foreground and uses system callbacks rather than constant polling.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">How do I delete my connection history?</p>
+                <p class="faq-answer">Your connection history is stored locally on your device. You can clear it through the app's history view, or simply delete and reinstall the app to remove all data.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">Why doesn't VPN detection always work?</p>
+                <p class="faq-answer">VPN detection depends on how your VPN provider implements their connection. Most VPNs are detected through standard interface names, but some custom implementations may not be recognized. If you notice your VPN isn't being detected, please report it to us.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">What does "Constrained" connection mean?</p>
+                <p class="faq-answer">A constrained connection indicates that Low Data Mode is enabled on your device. This iOS setting reduces data usage by limiting background tasks. You can change this in Settings → Cellular or Settings → WiFi → [Your Network] → Low Data Mode.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">What does "Expensive" connection mean?</p>
+                <p class="faq-answer">An "expensive" connection typically means you're on cellular data or using a personal hotspot. This is iOS's way of indicating that data usage on this connection may incur charges or count against a data cap.</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <h2>System Requirements</h2>
+            <div class="requirements">
+                <ul>
+                    <li>iOS 17.0 or later</li>
+                    <li>iPhone or iPad</li>
+                    <li>Network connection (WiFi or Cellular)</li>
+                    <li>Approximately 10 MB of storage</li>
+                </ul>
+            </div>
+
+            <h2>Known Limitations</h2>
+            <p>Due to iOS restrictions, the app cannot:</p>
+            <ul>
+                <li>Monitor connectivity in the background continuously</li>
+                <li>Access specific WiFi network names (SSID) without location permission</li>
+                <li>Detect all VPN configurations (depends on implementation)</li>
+            </ul>
+        </div>
+
+        <div class="contact-card">
+            <h2>Still Need Help?</h2>
+            <p>If you didn't find the answer you were looking for, or if you've found a bug, please reach out to us on GitHub.</p>
+            <a href="https://github.com/GDemay/Online-now/issues/new" class="contact-button">Open a Support Ticket</a>
+        </div>
+
+        <div class="content">
+            <a href="index.html" class="back-link">← Back to Home</a>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 GDemay. All rights reserved.</p>
+        <p><a href="privacy.html">Privacy Policy</a></p>
+    </footer>
+</body>
+</html>

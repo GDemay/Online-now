@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Now - Network Connectivity Monitor</title>
+    <meta name="description" content="Online Now is your essential network connectivity companion for iOS. Monitor your internet connection status in real-time.">
+    <meta name="apple-itunes-app" content="app-id=YOUR_APP_ID">
+    <style>
+        :root {
+            --primary: #3A9BF9;
+            --secondary: #66B3FA;
+            --success: #34C759;
+            --dark: #1C1C1E;
+            --light: #F2F2F7;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 60px 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        .app-icon {
+            width: 120px;
+            height: 120px;
+            border-radius: 27px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            font-size: 1.25rem;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .app-store-badge {
+            height: 54px;
+            transition: transform 0.2s;
+        }
+
+        .app-store-badge:hover {
+            transform: scale(1.05);
+        }
+
+        .features {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        .features h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--dark);
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 24px;
+        }
+
+        .feature {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+        }
+
+        .feature h3 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--dark);
+        }
+
+        .feature p {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .links {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 30px 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        .links a {
+            display: inline-block;
+            margin: 10px 20px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .links a:hover {
+            color: var(--secondary);
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: white;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .tagline {
+                font-size: 1rem;
+            }
+
+            .features, .links {
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <img src="app-icon.png" alt="Online Now App Icon" class="app-icon" onerror="this.style.display='none'">
+            <h1>Online Now</h1>
+            <p class="tagline">Your Essential Network Connectivity Companion</p>
+            <a href="https://apps.apple.com/app/idYOUR_APP_ID">
+                <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
+                     alt="Download on the App Store"
+                     class="app-store-badge">
+            </a>
+        </div>
+
+        <div class="features">
+            <h2>Features</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <div class="feature-icon">📡</div>
+                    <h3>Real-Time Monitoring</h3>
+                    <p>Instant connectivity status updates as your network changes</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📶</div>
+                    <h3>Connection Detection</h3>
+                    <p>Identify WiFi, Cellular, or Ethernet connections</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <h3>VPN Detection</h3>
+                    <p>Know when your VPN is active and protecting you</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Speed Testing</h3>
+                    <p>Measure your connection speed with one tap</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <h3>Connection History</h3>
+                    <p>Track your connectivity patterns over time</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔋</div>
+                    <h3>Battery Efficient</h3>
+                    <p>Optimized to minimize battery consumption</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="links">
+            <a href="privacy.html">Privacy Policy</a>
+            <a href="support.html">Support</a>
+            <a href="https://github.com/GDemay/Online-now">GitHub</a>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 GDemay. All rights reserved.</p>
+        <p><a href="privacy.html">Privacy Policy</a> · <a href="support.html">Support</a></p>
+    </footer>
+</body>
+</html>

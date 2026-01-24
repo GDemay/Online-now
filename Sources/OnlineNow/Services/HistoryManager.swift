@@ -91,7 +91,7 @@ public final class HistoryManager: ObservableObject {
             let predicate = #Predicate<ConnectivityCheck> {
                 $0.timestamp >= startDate && $0.timestamp <= endDate
             }
-            var descriptor = FetchDescriptor<ConnectivityCheck>(
+            let descriptor = FetchDescriptor<ConnectivityCheck>(
                 predicate: predicate,
                 sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
             )
@@ -128,7 +128,7 @@ public final class HistoryManager: ObservableObject {
         guard let context = modelContext else { return }
 
         do {
-            var descriptor = FetchDescriptor<ConnectivityCheck>(
+            let descriptor = FetchDescriptor<ConnectivityCheck>(
                 sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
             )
 
