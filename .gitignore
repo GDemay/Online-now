@@ -1,7 +1,6 @@
 # Xcode
-*.xcodeproj
-*.xcworkspace
-!*.xcworkspace/contents.xcworkspacedata
+# Keep xcodeproj tracked for Xcode Cloud
+# Ignore standalone xcworkspace but keep the one inside xcodeproj
 *.xcuserdata
 *.xcuserdatad
 *.xcuserstate
