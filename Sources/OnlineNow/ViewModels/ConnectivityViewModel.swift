@@ -43,7 +43,9 @@ public final class ConnectivityViewModel: ObservableObject {
             isConnected = true
             isReachable = true
             connectionType = .wifi
-            latencyMs = 23
+            rttMs = 15
+            responseTimeMs = 23
+            latencyMs = 15  // For backward compatibility
             speedResult = SpeedTestResult(
                 speedMbps: 156.8, bytesDownloaded: 19_660_800, durationSeconds: 1.0, error: nil)
             signalQuality = "Excellent"
@@ -54,6 +56,8 @@ public final class ConnectivityViewModel: ObservableObject {
             isConnected = false
             isReachable = false
             connectionType = .none
+            rttMs = nil
+            responseTimeMs = nil
             latencyMs = nil
             speedResult = nil
             signalQuality = "No Signal"
@@ -64,7 +68,9 @@ public final class ConnectivityViewModel: ObservableObject {
             isConnected = true
             isReachable = false
             connectionType = .wifi
-            latencyMs = 450
+            rttMs = 320
+            responseTimeMs = 450
+            latencyMs = 320
             speedResult = SpeedTestResult(
                 speedMbps: 2.1, bytesDownloaded: 262_144, durationSeconds: 1.0, error: nil)
             signalQuality = "Poor"
@@ -119,7 +125,17 @@ public final class ConnectivityViewModel: ObservableObject {
     /// Latest speed test result
     @Published public private(set) var speedResult: SpeedTestResult?
 
-    /// Latency from last reachability check
+    /// True network latency (RTT) from TCP measurement
+    @Published public private(set) var rttMs: Double?
+
+    /// HTTP response time (includes DNS, TCP, TLS, server processing)
+    @Published public private(set) var responseTimeMs: Double?
+
+    /// Legacy latency property for backward compatibility
+    @available(
+        *, deprecated,
+        message: "Use rttMs for network latency or responseTimeMs for full HTTP timing"
+    )
     @Published public private(set) var latencyMs: Double?
 
     /// Error message if any
@@ -137,12 +153,21 @@ public final class ConnectivityViewModel: ObservableObject {
     /// Signal strength description
     @Published public private(set) var signalQuality: String = "Unknown"
 
+    /// Diagnostic mode - enables validation against system tools
+    @Published public var isDiagnosticMode: Bool = false
+
+    /// Latest diagnostic results
+    @Published public private(set) var diagnosticResults: [DiagnosticResult] = []
+
     // MARK: - Services
 
     private let networkMonitor: NetworkMonitor
     private let reachabilityService: ReachabilityService
     private let speedTestService: SpeedTestService
+    private let latencyService: LatencyMeasurementService
+    private let diagnosticService: DiagnosticService
     public let historyManager: HistoryManager
+    public let tippingManager: TippingManager
 
     // MARK: - Timers
 
@@ -157,7 +182,10 @@ public final class ConnectivityViewModel: ObservableObject {
         self.networkMonitor = NetworkMonitor()
         self.reachabilityService = ReachabilityService()
         self.speedTestService = SpeedTestService()
+        self.latencyService = LatencyMeasurementService()
+        self.diagnosticService = DiagnosticService()
         self.historyManager = HistoryManager()
+        self.tippingManager = TippingManager()
 
         setupNetworkMonitorObservation()
     }
@@ -237,12 +265,18 @@ public final class ConnectivityViewModel: ObservableObject {
         print("🌐 Performing reachability check...")
         let reachabilityResult = await reachabilityService.checkReachability()
         print(
-            "✅ Reachability result: \(reachabilityResult.isReachable), latency: \(reachabilityResult.latencyMs)ms, error: \(reachabilityResult.error ?? "none")"
+            "✅ Reachability result: \(reachabilityResult.isReachable), response time: \(reachabilityResult.responseTimeMs)ms, error: \(reachabilityResult.error ?? "none")"
         )
 
         isReachable = reachabilityResult.isReachable
-        latencyMs = reachabilityResult.latencyMs
+        responseTimeMs = reachabilityResult.responseTimeMs
+        latencyMs = reachabilityResult.responseTimeMs  // For backward compatibility
         lastCheckTime = Date()
+
+        // Measure true network latency (RTT) using TCP
+        let latencyResult = await latencyService.measureTCPLatency(to: .cloudflare)
+        rttMs = latencyResult.rttMs
+        print("📡 TCP latency: \(latencyResult.formattedLatency) to \(latencyResult.endpoint)")
 
         // If reachability check failed but network is connected, log error
         if !reachabilityResult.isReachable {
@@ -289,13 +323,45 @@ public final class ConnectivityViewModel: ObservableObject {
             connectionType: connectionType,
             isReachable: isReachable,
             speedMbps: speedResult?.speedMbps,
-            latencyMs: latencyMs,
+            latencyMs: rttMs ?? responseTimeMs,  // Use RTT if available, otherwise response time
             isVPNActive: isVPNActive,
             errorMessage: errorMessage
         )
 
+        // Trigger tip prompt after speed test (if appropriate)
+        if speedTestResult.error == nil {
+            tippingManager.recordSpeedTestCompleted()
+        }
+
         // Update signal quality
         updateSignalQuality()
+    }
+
+    // MARK: - Diagnostic Methods
+
+    /// Runs comprehensive diagnostics and compares with system tools
+    /// - Note: macOS only for full diagnostics (uses system ping)
+    public func runDiagnostics() async {
+        guard isDiagnosticMode else { return }
+
+        print("🔬 Running diagnostics...")
+        let results = await diagnosticService.runFullDiagnostics()
+        diagnosticResults = results
+
+        print("📊 Diagnostic Results:")
+        for result in results {
+            print(result.summary)
+        }
+    }
+
+    /// Validates latency against system ping
+    public func validateLatency() async -> DiagnosticResult {
+        return await diagnosticService.validateLatency()
+    }
+
+    /// Validates speed test measurements
+    public func validateSpeedTest() async -> DiagnosticResult {
+        return await diagnosticService.validateSpeedTest()
     }
 
     /// Check if a specific endpoint is reachable
@@ -329,11 +395,11 @@ public final class ConnectivityViewModel: ObservableObject {
             return
         }
 
-        // Calculate latency score (0-4 points)
+        // Calculate latency score (0-4 points) using true network RTT
         // More generous thresholds - most connections have 20-100ms latency
         let latencyScore: Int
-        if let latency = latencyMs {
-            switch latency {
+        if let rtt = rttMs {
+            switch rtt {
             case 0..<20: latencyScore = 4  // Excellent
             case 20..<50: latencyScore = 3  // Good
             case 50..<100: latencyScore = 2  // Fair
@@ -411,7 +477,7 @@ public final class ConnectivityViewModel: ObservableObject {
             connectionType: connectionType,
             isReachable: isReachable,
             speedMbps: speedResult?.speedMbps,
-            latencyMs: latencyMs,
+            latencyMs: rttMs ?? responseTimeMs,  // Use real network RTT, fallback to response time
             isVPNActive: isVPNActive,
             errorMessage: errorMessage
         )

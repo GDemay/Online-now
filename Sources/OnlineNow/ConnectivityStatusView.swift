@@ -10,6 +10,7 @@ public struct ConnectivityStatusView: View {
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel = ConnectivityViewModel()
     @State private var showHistory = false
+    @State private var showTipJar = false
     @State private var selectedStatType: StatType?
     @Namespace private var animation
 
@@ -46,6 +47,20 @@ public struct ConnectivityStatusView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showTipJar = true
+                    } label: {
+                        Image(systemName: "cup.and.saucer.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(height: 36)
+                            .padding(.horizontal, 12)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
+                    .accessibilityLabel("Support developer")
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showHistory = true
@@ -63,6 +78,9 @@ public struct ConnectivityStatusView: View {
                 HistoryListView(historyManager: viewModel.historyManager)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showTipJar) {
+                TipJarView(tippingManager: viewModel.tippingManager)
             }
             .sheet(item: $selectedStatType) { statType in
                 StatDetailView(
@@ -113,6 +131,32 @@ public struct ConnectivityStatusView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
+            .overlay {
+                // Contextual tip prompt
+                if viewModel.tippingManager.shouldShowTipPrompt,
+                    let trigger = viewModel.tippingManager.tipPromptTrigger
+                {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                viewModel.tippingManager.dismissTipPrompt()
+                            }
+
+                        TipPromptView(
+                            trigger: trigger,
+                            onShowTipJar: {
+                                viewModel.tippingManager.dismissTipPrompt()
+                                showTipJar = true
+                            },
+                            onDismiss: {
+                                viewModel.tippingManager.dismissTipPrompt()
+                            }
+                        )
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                }
+            }
         }
     }
 
@@ -126,8 +170,9 @@ public struct ConnectivityStatusView: View {
             }
             return "—"
         case .latency:
-            if let latency = viewModel.latencyMs {
-                return String(format: "%.0f", latency)
+            // Use real network RTT (TCP latency), not HTTP response time
+            if let rtt = viewModel.rttMs {
+                return String(format: "%.0f", rtt)
             }
             return "—"
         case .quality:
@@ -295,14 +340,14 @@ public struct ConnectivityStatusView: View {
                     selectedStatType = .speed
                 }
 
-                // Latency card - tappable
+                // Latency card - tappable (shows real network RTT)
                 MiniStatCard(
                     title: "Latency",
-                    value: viewModel.latencyMs != nil
-                        ? String(format: "%.0f", viewModel.latencyMs!) : "—",
-                    unit: viewModel.latencyMs != nil ? "ms" : "",
-                    icon: "clock.fill",
-                    color: viewModel.latencyMs != nil ? latencyColor(viewModel.latencyMs!) : .gray,
+                    value: viewModel.rttMs != nil
+                        ? String(format: "%.0f", viewModel.rttMs!) : "—",
+                    unit: viewModel.rttMs != nil ? "ms" : "",
+                    icon: "timer",
+                    color: viewModel.rttMs != nil ? latencyColor(viewModel.rttMs!) : .gray,
                     showChevron: true
                 )
                 .onTapGesture {

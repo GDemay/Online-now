@@ -113,7 +113,7 @@ public actor ReachabilityService: ReachabilityChecking {
         let elapsed = Date().timeIntervalSince(startTime) * 1000
         return ReachabilityResult(
             isReachable: false,
-            latencyMs: elapsed,
+            responseTimeMs: elapsed,
             error: "Unable to reach internet"
         )
     }
@@ -197,7 +197,7 @@ public actor ReachabilityService: ReachabilityChecking {
         if captiveResult.isCaptivePortal {
             return (
                 ReachabilityResult(
-                    isReachable: false, latencyMs: 0, error: "Behind captive portal"),
+                    isReachable: false, responseTimeMs: 0, error: "Behind captive portal"),
                 captiveResult
             )
         }
@@ -246,10 +246,10 @@ public actor ReachabilityService: ReachabilityChecking {
                     }
 
                     if isSuccess {
-                        let latency = Date().timeIntervalSince(checkStart) * 1000
+                        let responseTime = Date().timeIntervalSince(checkStart) * 1000
                         return ReachabilityResult(
                             isReachable: true,
-                            latencyMs: latency,
+                            responseTimeMs: responseTime,
                             error: nil
                         )
                     }
@@ -271,15 +271,34 @@ public struct ReachabilityResult: Sendable {
     /// Whether the internet is reachable
     public let isReachable: Bool
 
-    /// Latency in milliseconds
-    public let latencyMs: Double
+    /// HTTP response time in milliseconds (includes DNS, TCP, TLS, server processing)
+    /// Note: This is NOT pure network latency - use LatencyMeasurementService for RTT
+    public let responseTimeMs: Double
 
     /// Error message if check failed
     public let error: String?
 
+    /// Legacy property for backward compatibility
+    @available(
+        *, deprecated,
+        message:
+            "Use responseTimeMs instead - this measures HTTP response time, not pure network latency"
+    )
+    public var latencyMs: Double {
+        return responseTimeMs
+    }
+
+    public init(isReachable: Bool, responseTimeMs: Double, error: String?) {
+        self.isReachable = isReachable
+        self.responseTimeMs = responseTimeMs
+        self.error = error
+    }
+
+    /// Legacy initializer for backward compatibility
+    @available(*, deprecated, message: "Use init with responseTimeMs parameter")
     public init(isReachable: Bool, latencyMs: Double, error: String?) {
         self.isReachable = isReachable
-        self.latencyMs = latencyMs
+        self.responseTimeMs = latencyMs
         self.error = error
     }
 }

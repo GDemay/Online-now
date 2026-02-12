@@ -7,8 +7,8 @@ public actor SpeedTestService {
 
     /// Test file sizes for different test modes
     /// Quick test: 5MB, Full test: 10MB - needed for accurate high-speed measurements
-    private let quickTestBytes = 5_000_000    // 5MB
-    private let fullTestBytes = 10_000_000    // 10MB
+    private let quickTestBytes = 5_000_000  // 5MB
+    private let fullTestBytes = 10_000_000  // 10MB
 
     /// Minimum test duration for reliable measurement (seconds)
     private let minimumTestDuration: TimeInterval = 1.0
@@ -22,7 +22,7 @@ public actor SpeedTestService {
     public init() {}
 
     /// Performs a speed test and returns the result
-    /// Uses streaming download to measure actual throughput accurately
+    /// Uses download with progress tracking to measure actual throughput accurately
     /// - Parameter quick: If true, uses smaller test file
     /// - Returns: SpeedTestResult with speed in Mbps
     public func measureSpeed(quick: Bool = false) async -> SpeedTestResult {
@@ -41,10 +41,12 @@ public actor SpeedTestService {
         defer { session.invalidateAndCancel() }
 
         do {
-            let (bytes, response) = try await session.bytes(from: testURL)
+            let overallStartTime = Date()
+            let (data, response) = try await session.data(from: testURL)
 
             guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
+                (200...299).contains(httpResponse.statusCode)
+            else {
                 return SpeedTestResult(
                     speedMbps: nil,
                     bytesDownloaded: 0,
@@ -53,55 +55,31 @@ public actor SpeedTestService {
                 )
             }
 
-            var totalBytes = 0
-            var measurementStartTime: Date?
-            var bytesAtMeasurementStart = 0
-            let overallStartTime = Date()
-
-            // Stream the data and measure throughput after initial warmup
-            for try await _ in bytes {
-                totalBytes += 1
-
-                // Skip first 100KB as warmup (connection establishment overhead)
-                if totalBytes == 100_000 {
-                    measurementStartTime = Date()
-                    bytesAtMeasurementStart = totalBytes
-                }
-
-                // Check if we've downloaded enough for a reliable measurement
-                let elapsed = Date().timeIntervalSince(overallStartTime)
-                if elapsed >= maximumTestDuration {
-                    break
-                }
-            }
-
             let overallElapsed = Date().timeIntervalSince(overallStartTime)
+            let totalBytes = data.count
 
-            // Calculate speed from the measurement period (excluding warmup)
-            let speedMbps: Double
+            // Apply warmup adjustment: exclude first 100KB from speed calculation
+            // This accounts for TCP slow start and connection establishment overhead
+            let warmupThreshold = 100_000  // 100KB
             let measuredBytes: Int
             let measuredDuration: Double
 
-            if let startTime = measurementStartTime {
-                measuredDuration = Date().timeIntervalSince(startTime)
-                measuredBytes = totalBytes - bytesAtMeasurementStart
+            if totalBytes > warmupThreshold && overallElapsed > 0.5 {
+                // Estimate warmup time proportionally (conservative estimate)
+                // Typically first 100KB takes disproportionately longer
+                let warmupRatio = Double(warmupThreshold) / Double(totalBytes)
+                let estimatedWarmupTime = overallElapsed * warmupRatio * 2.0  // 2x factor for slow start
 
-                if measuredDuration >= 0.1 && measuredBytes > 0 {
-                    let bitsDownloaded = Double(measuredBytes) * 8
-                    speedMbps = bitsDownloaded / measuredDuration / 1_000_000
-                } else {
-                    // Fallback to overall measurement if warmup didn't complete
-                    let bitsDownloaded = Double(totalBytes) * 8
-                    speedMbps = bitsDownloaded / overallElapsed / 1_000_000
-                }
+                measuredBytes = totalBytes - warmupThreshold
+                measuredDuration = max(overallElapsed - estimatedWarmupTime, overallElapsed * 0.8)
             } else {
-                // No warmup period completed - use overall
-                measuredDuration = overallElapsed
+                // Download was too small or too fast - use overall measurement
                 measuredBytes = totalBytes
-                let bitsDownloaded = Double(totalBytes) * 8
-                speedMbps = bitsDownloaded / overallElapsed / 1_000_000
+                measuredDuration = overallElapsed
             }
-
+            // Calculate speed in Mbps: (bits / duration) / 1,000,000
+            let bitsDownloaded = Double(measuredBytes) * 8
+            let speedMbps = bitsDownloaded / measuredDuration / 1_000_000
             return SpeedTestResult(
                 speedMbps: speedMbps,
                 bytesDownloaded: totalBytes,

@@ -24,8 +24,22 @@ public final class ConnectivityCheck {
     /// Measured download speed in Mbps (nil if not measured)
     public var speedMbps: Double?
 
-    /// Latency in milliseconds (nil if not measured)
+    /// True network latency (TCP RTT) in milliseconds (nil if not measured)
+    public var rttMs: Double?
+
+    /// HTTP response time in milliseconds (nil if not measured)
+    /// Includes DNS, TCP, TLS, and server processing time
+    public var responseTimeMs: Double?
+
+    /// Legacy latency property (for backward compatibility)
+    /// Note: In newer versions, use rttMs for network latency or responseTimeMs for HTTP timing
+    @available(
+        *, deprecated, message: "Use rttMs for network latency or responseTimeMs for HTTP timing"
+    )
     public var latencyMs: Double?
+
+    /// Method used for latency measurement (e.g., "TCP", "HTTP")
+    public var measurementMethod: String?
 
     /// Whether a VPN was active during the check
     public var isVPNActive: Bool
@@ -40,7 +54,10 @@ public final class ConnectivityCheck {
         connectionType: String,
         isReachable: Bool,
         speedMbps: Double? = nil,
+        rttMs: Double? = nil,
+        responseTimeMs: Double? = nil,
         latencyMs: Double? = nil,
+        measurementMethod: String? = nil,
         isVPNActive: Bool = false,
         errorMessage: String? = nil
     ) {
@@ -50,7 +67,10 @@ public final class ConnectivityCheck {
         self.connectionType = connectionType
         self.isReachable = isReachable
         self.speedMbps = speedMbps
-        self.latencyMs = latencyMs
+        self.rttMs = rttMs
+        self.responseTimeMs = responseTimeMs
+        self.latencyMs = latencyMs ?? rttMs  // Fallback to rttMs for backward compatibility
+        self.measurementMethod = measurementMethod
         self.isVPNActive = isVPNActive
         self.errorMessage = errorMessage
     }

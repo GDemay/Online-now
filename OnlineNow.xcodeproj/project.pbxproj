@@ -3,17 +3,20 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0455E57544559CA3CAB19722 /* DiagnosticService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 970AE6A9605A745B6098389D /* DiagnosticService.swift */; };
 		09A1EE6271B2BBB4AD723045 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364DAE63624E5C3D01D24825 /* NetworkMonitor.swift */; };
 		0A2EF3774B2A2BDC1C1A11E4 /* ConnectivityBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66743D154A795A73094D51AB /* ConnectivityBanner.swift */; };
 		188E4D35412B49720844C522 /* MockNetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B893A08A710CCFF6260809C /* MockNetworkMonitor.swift */; };
+		2D3A3E54D57DF192E04A2866 /* SupporterViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BA7F140A2FE89E5063C423 /* SupporterViews.swift */; };
 		4E0ECD38BD27623DDF6BB78C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7BF42FE4F30890F8479A8360 /* PrivacyInfo.xcprivacy */; };
 		5B638AE9D3892BD3B7E4F5B9 /* ConnectivityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1005405935CD4A8787B3B225 /* ConnectivityViewModel.swift */; };
 		624821973989B9BCCDE1EF09 /* LogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2A3A78DCBC93D9D202B4F0 /* LogoView.swift */; };
 		701E7C5961302094B2B7C676 /* ConnectivityCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = D414BD2E2A8B2AF38633E7B3 /* ConnectivityCheck.swift */; };
+		70DEA087D03FDC7B6B7C5A92 /* TipJarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5932EFD8ABDBD412CDF17DF2 /* TipJarView.swift */; };
 		72DF3E3B79D29CD4F35E8920 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9BCC61696252B6B6890E0106 /* Assets.xcassets */; };
 		7738A395DE441CC89E27F0D5 /* ConnectivityProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4005937A7CC133C81C836A0A /* ConnectivityProtocol.swift */; };
 		78A1E67B0F50AB249C0D37C4 /* ReachabilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88FF2F3FBDD470EAC346073C /* ReachabilityService.swift */; };
@@ -26,6 +29,8 @@
 		D25923A08E6A9DFD268FBB02 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E3B05A01206646C3EC4B99 /* HistoryManager.swift */; };
 		D71A643EC2E63101D3394D79 /* ConnectivityStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 791C46F53FEB01D7C2EC4945 /* ConnectivityStatusView.swift */; };
 		D7E454E24BEA30B44730CDF9 /* OnlineNowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5336AB661BAD4BCA9CE0827C /* OnlineNowApp.swift */; };
+		E21C19188F238E5AEB0919B1 /* LatencyMeasurementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C4FCECB9E079EE19C205B8 /* LatencyMeasurementService.swift */; };
+		FFA55C1C47445517385732FE /* TippingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B883CE719A71B2D0C05FC0 /* TippingManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,15 +42,20 @@
 		5336AB661BAD4BCA9CE0827C /* OnlineNowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineNowApp.swift; sourceTree = "<group>"; };
 		5516F120678075B92C5D7613 /* OnlineNow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineNow.swift; sourceTree = "<group>"; };
 		55FD7ABF7A13146968713DB6 /* SpeedTestService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTestService.swift; sourceTree = "<group>"; };
-		61055ABB3D0DF27FE036BD32 /* OnlineNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OnlineNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5932EFD8ABDBD412CDF17DF2 /* TipJarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipJarView.swift; sourceTree = "<group>"; };
+		61055ABB3D0DF27FE036BD32 /* OnlineNow.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OnlineNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		653D91E7640236AF6FD3F7EE /* HistoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryListView.swift; sourceTree = "<group>"; };
 		66743D154A795A73094D51AB /* ConnectivityBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityBanner.swift; sourceTree = "<group>"; };
 		6925BC12715039D51D123A8F /* SharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTypes.swift; sourceTree = "<group>"; };
+		74C4FCECB9E079EE19C205B8 /* LatencyMeasurementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatencyMeasurementService.swift; sourceTree = "<group>"; };
 		791C46F53FEB01D7C2EC4945 /* ConnectivityStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityStatusView.swift; sourceTree = "<group>"; };
-		7BF42FE4F30890F8479A8360 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		7BF42FE4F30890F8479A8360 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		88FF2F3FBDD470EAC346073C /* ReachabilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReachabilityService.swift; sourceTree = "<group>"; };
+		92BA7F140A2FE89E5063C423 /* SupporterViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupporterViews.swift; sourceTree = "<group>"; };
+		970AE6A9605A745B6098389D /* DiagnosticService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticService.swift; sourceTree = "<group>"; };
 		9B893A08A710CCFF6260809C /* MockNetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockNetworkMonitor.swift; sourceTree = "<group>"; };
 		9BCC61696252B6B6890E0106 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B3B883CE719A71B2D0C05FC0 /* TippingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TippingManager.swift; sourceTree = "<group>"; };
 		C4E3B05A01206646C3EC4B99 /* HistoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryManager.swift; sourceTree = "<group>"; };
 		CE55FCE555450D7A5300DEF8 /* StatDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatDetailView.swift; sourceTree = "<group>"; };
 		D0182E782E5F20C8EE0A82F4 /* NetworkRetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkRetry.swift; sourceTree = "<group>"; };
@@ -82,10 +92,13 @@
 		62036E5390CECEA0B13AC724 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				970AE6A9605A745B6098389D /* DiagnosticService.swift */,
 				C4E3B05A01206646C3EC4B99 /* HistoryManager.swift */,
+				74C4FCECB9E079EE19C205B8 /* LatencyMeasurementService.swift */,
 				D0182E782E5F20C8EE0A82F4 /* NetworkRetry.swift */,
 				88FF2F3FBDD470EAC346073C /* ReachabilityService.swift */,
 				55FD7ABF7A13146968713DB6 /* SpeedTestService.swift */,
+				B3B883CE719A71B2D0C05FC0 /* TippingManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -149,6 +162,8 @@
 				653D91E7640236AF6FD3F7EE /* HistoryListView.swift */,
 				1A2A3A78DCBC93D9D202B4F0 /* LogoView.swift */,
 				CE55FCE555450D7A5300DEF8 /* StatDetailView.swift */,
+				92BA7F140A2FE89E5063C423 /* SupporterViews.swift */,
+				5932EFD8ABDBD412CDF17DF2 /* TipJarView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -184,6 +199,7 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					F0170DDDF482329F9B489E04 = {
+						DevelopmentTeam = MV634X2D7X;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -198,6 +214,7 @@
 			);
 			mainGroup = 534889ECE329A9C5798FC9FA;
 			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -228,8 +245,10 @@
 				7738A395DE441CC89E27F0D5 /* ConnectivityProtocol.swift in Sources */,
 				D71A643EC2E63101D3394D79 /* ConnectivityStatusView.swift in Sources */,
 				5B638AE9D3892BD3B7E4F5B9 /* ConnectivityViewModel.swift in Sources */,
+				0455E57544559CA3CAB19722 /* DiagnosticService.swift in Sources */,
 				C6FC8E261DFD9331D4B324FE /* HistoryListView.swift in Sources */,
 				D25923A08E6A9DFD268FBB02 /* HistoryManager.swift in Sources */,
+				E21C19188F238E5AEB0919B1 /* LatencyMeasurementService.swift in Sources */,
 				624821973989B9BCCDE1EF09 /* LogoView.swift in Sources */,
 				188E4D35412B49720844C522 /* MockNetworkMonitor.swift in Sources */,
 				09A1EE6271B2BBB4AD723045 /* NetworkMonitor.swift in Sources */,
@@ -240,6 +259,9 @@
 				9DB97A5E5EBF3DCC3DB76193 /* SharedTypes.swift in Sources */,
 				CE319F6FC9C7F3C26C10E81E /* SpeedTestService.swift in Sources */,
 				7E9E9643174E05A9D9D95EEC /* StatDetailView.swift in Sources */,
+				2D3A3E54D57DF192E04A2866 /* SupporterViews.swift in Sources */,
+				70DEA087D03FDC7B6B7C5A92 /* TipJarView.swift in Sources */,
+				FFA55C1C47445517385732FE /* TippingManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -375,7 +397,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = GB87Z9SKC5;
+				DEVELOPMENT_TEAM = MV634X2D7X;
 				ENABLE_BITCODE = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -409,7 +431,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = GB87Z9SKC5;
+				DEVELOPMENT_TEAM = MV634X2D7X;
 				ENABLE_BITCODE = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
