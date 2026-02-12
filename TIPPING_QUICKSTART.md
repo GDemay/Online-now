@@ -2,28 +2,25 @@
 
 ## ✅ What's Been Implemented
 
-The Apple Pay tipping feature is now **fully integrated** into OnlineNow! Here's what you got:
+The donation feature is now **fully integrated** into OnlineNow! Here's what you got:
 
 ### Core Functionality
 - ✅ **TippingManager**: Complete StoreKit 2 integration with purchase handling
-- ✅ **Three Tip Tiers**: Small ($2), Medium ($5), Large ($10)
-- ✅ **TipJar UI**: Beautiful, modern interface with gradient accents
+- ✅ **One Donation Option**: $1 donation to support development
+- ✅ **TipJar UI**: Beautiful, modern interface with gratitude messaging
 - ✅ **Contextual Prompts**: Smart timing after key moments
-- ✅ **Supporter Benefits Tracking**: Badge system with unlockables
 - ✅ **Cross-Platform**: Works on iOS 15+, macOS 12+, watchOS 8+
 
 ### UI Components
 - ✅ **TipJarView**: Full-featured tip jar with product display
 - ✅ **TipPromptView**: Contextual prompt overlay with blur backdrop
-- ✅ **SupporterBenefitsView**: Benefits showcase and status tracking
-- ✅ **Toolbar Integration**: Coffee cup icon with supporter badge indicator
+- ✅ **Toolbar Integration**: Coffee cup icon for easy access
 
 ### Smart Features
 - ✅ **First Speed Test Prompt**: Shows after completing first speed test
 - ✅ **Frequent User Prompt**: After every 10 speed tests
 - ✅ **Rate Limiting**: Max one prompt per day to avoid annoyance
-- ✅ **Impact Messaging**: Shows how tips fund specific features
-- ✅ **Supporter Badges**: Visual recognition for supporters
+- ✅ **Gratitude Focus**: Pure donation with heartfelt thanks
 
 ---
 
@@ -42,10 +39,9 @@ The app includes `Configuration.storekit` for immediate testing:
 ### 2. Test the Flow
 
 1. **Open Tip Jar**: Tap the coffee cup icon in top-left corner
-2. **View Products**: See all three tip tiers with prices
-3. **Make Purchase**: Tap any tier to test purchase flow
-4. **See Thank You**: Confirmation alert with impact message
-5. **Check Badge**: Coffee cup icon now shows supporter badge (💙 or ⭐️)
+2. **View Product**: See the $1 donation option
+3. **Make Purchase**: Tap to test purchase flow
+4. **See Thank You**: Confirmation alert with gratitude message
 
 ### 3. Test Contextual Prompts
 
@@ -69,15 +65,14 @@ Before you can receive real payments, set up products in App Store Connect:
 
 ### Required Steps
 
-1. **Create In-App Purchase Products** (see [TIPPING_SETUP_GUIDE.md](TIPPING_SETUP_GUIDE.md))
-   - Product IDs must match exactly:
-     - `com.gdemay.onlinenow.tip.small`
-     - `com.gdemay.onlinenow.tip.medium`
-     - `com.gdemay.onlinenow.tip.large`
+1. **Create In-App Purchase Product** (see [TIPPING_SETUP_GUIDE.md](TIPPING_SETUP_GUIDE.md))
+   - Product ID must match exactly: `onlinenow.gdemay`
+   - Price: $0.99 (Tier 1)
+   - Reference Name: `donation`
 
-2. **Submit Products for Review**
-   - Attach screenshots of the tip jar
-   - Include review notes explaining functionality
+2. **Submit Product for Review**
+   - Attach screenshot of the tip jar
+   - Include review notes: "Consumable donation, no content unlocked"
 
 3. **Update App Privacy**
    - Add Purchase History under App Privacy section
@@ -92,63 +87,40 @@ Before you can receive real payments, set up products in App Store Connect:
 
 ### Monitor Performance
 
-Track tipping in App Store Connect:
+Track donations in App Store Connect:
 - **Sales and Trends**: Filter by In-App Purchases
-- **Proceeds**: US prices - 15% Apple commission for <$1M revenue
-  - $2 tip = $1.70 to you
-  - $5 tip = $4.25 to you
-  - $10 tip = $8.50 to you
+- **Proceeds**: $0.99 donation - 15% Apple commission = **$0.84 per donation**
+  (30% commission for first year, 15% after $1M revenue)
 
 ### Expected Conversion Rates
 
 Based on industry benchmarks:
-- **Freemium apps**: 1-3% of users tip
+- **Freemium apps**: 1-3% of users donate
 - **With smart prompts**: 3-7% conversion possible
 - **Power users**: 10-15% conversion after 10+ speed tests
 
-**Example**: 1,000 monthly users × 5% conversion × $5 average = **$250/month**
+**Example**: 1,000 monthly users × 5% conversion × $0.84 net = **$42/month**
 
 ---
 
-## 🎨 Supporter Benefits Roadmap
+## 🔮 Future Enhancements
 
-### Current Benefits (Implemented)
+### Consider Adding Multiple Tiers
 
-| Benefit | Requirement | Status |
-|---------|-------------|--------|
-| Name in Credits | $2+ | 🔜 Coming next |
-| Supporter Badge | $5+ | ✅ Live |
-| Power Supporter Badge | $10+ | ✅ Live |
-| Priority Support | $10+ | 📝 Manual process |
+If donations perform well, expand to multiple options:
+- **Small**: $1 (current)
+- **Medium**: $5 
+- **Large**: $10
 
-### Future Benefits (To Implement)
+### Potential Supporter Benefits
 
-#### 1. Custom App Icons (High Priority)
-```swift
-// Add to settings or tip jar:
-// 1. Design 3-5 icon variants
-// 2. Add to Assets.xcassets
-// 3. Update Info.plist with CFBundleIcons
-// 4. Add UIApplication.shared.setAlternateIconName()
-```
+If you want to reward donors:
+- Custom app icons
+- Name in credits
+- Beta feature access
+- Priority support
 
-#### 2. Name in Credits
-```swift
-// Add credits view:
-// 1. Store supporter names in UserDefaults or CloudKit
-// 2. Create CreditsView listing all supporters
-// 3. Link from settings or about section
-```
-
-#### 3. Beta Feature Access
-```swift
-// Feature flag system:
-if tippingManager.isPowerSupporter {
-    // Show beta features
-    advancedAnalyticsToggle
-    ispComparisonBeta
-}
-```
+Note: Current implementation is pure donation with no benefits.
 
 ---
 

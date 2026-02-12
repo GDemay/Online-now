@@ -27,9 +27,7 @@ public final class TippingManager: ObservableObject {
     // MARK: - Product IDs
 
     private let productIDs: [String] = [
-        "com.gdemay.onlinenow.tip.small",  // $2
-        "com.gdemay.onlinenow.tip.medium",  // $5
-        "com.gdemay.onlinenow.tip.large",  // $10
+        "onlinenow.gdemay"  // $1 donation
     ]
 
     // MARK: - UserDefaults Keys

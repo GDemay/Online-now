@@ -5,48 +5,18 @@
   ],
   "products" : [
     {
-      "displayPrice" : "1.99",
+      "displayPrice" : "0.99",
       "familyShareable" : false,
-      "internalID" : "6738429501",
+      "internalID" : "6759104017",
       "localizations" : [
         {
-          "description" : "Buy me a coffee! Support development of OnlineNow.",
-          "displayName" : "Small Tip",
+          "description" : "Support OnlineNow development with a donation.",
+          "displayName" : "Donation",
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.gdemay.onlinenow.tip.small",
-      "referenceName" : "Small Tip ($2)",
-      "type" : "Consumable"
-    },
-    {
-      "displayPrice" : "4.99",
-      "familyShareable" : false,
-      "internalID" : "6738429502",
-      "localizations" : [
-        {
-          "description" : "Buy me lunch! Your support means a lot.",
-          "displayName" : "Medium Tip",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.gdemay.onlinenow.tip.medium",
-      "referenceName" : "Medium Tip ($5)",
-      "type" : "Consumable"
-    },
-    {
-      "displayPrice" : "9.99",
-      "familyShareable" : false,
-      "internalID" : "6738429503",
-      "localizations" : [
-        {
-          "description" : "Generous supporter! Unlock exclusive benefits.",
-          "displayName" : "Large Tip",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.gdemay.onlinenow.tip.large",
-      "referenceName" : "Large Tip ($10)",
+      "productID" : "onlinenow.gdemay",
+      "referenceName" : "donation",
       "type" : "Consumable"
     }
   ],

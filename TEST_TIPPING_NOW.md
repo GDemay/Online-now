@@ -21,35 +21,25 @@
 ```
 ☕️ Support OnlineNow
 
-💰 Three beautiful cards:
-   • Small Tip - $1.99
-     "Buy me a coffee! Support development..."
+💰 One donation option:
+   • Donation - $0.99
+     "Support OnlineNow development with a donation."
 
-   • Medium Tip - $4.99
-     "Buy me lunch! Your support means a lot."
+💖 Your Support Helps:
+   🔨 Keep the app maintained
+   ✨ Inspire future development
+   ☕️ Buy me a coffee
 
-   • Large Tip - $9.99
-     "Generous supporter! Unlock exclusive benefits."
-
-✨ Where Your Tip Goes:
-   📈 ISP comparison features
-   🗺️  WiFi location ratings
-   🔔 Smart notifications
-   📊 Advanced analytics
-
-🎁 Supporter Benefits:
-   ✅ Name in credits ($2+)
-   🎨 Custom app icons ($5+)
-   ⭐️ Beta feature access ($10+)
+🙏 Pure gratitude - no benefits provided
 ```
 
 ### Step 3: Try Making a Purchase
 ```bash
-1. Tap any tip amount (e.g., "Medium Tip - $4.99")
+1. Tap the donation amount ("Donation - $0.99")
 2. iOS system payment sheet appears
 3. With Configuration.storekit: Shows "Success" immediately
-4. Alert pops up: "Thank You! 💙"
-5. Close tip jar → Coffee cup now has 💙 badge!
+4. Alert pops up: "Thank You! 🙏"
+5. Total donations counter updates
 ```
 
 ---
@@ -65,10 +55,10 @@ StoreKit (in-app purchases) is built into iOS. When users tap a tip amount:
 ```
 Your App                    iOS System                  Apple
 --------                    ----------                  -----
-User taps "$4.99" →         Payment sheet appears  →    Processes payment
+User taps "$0.99" →         Payment sheet appears  →    Processes payment
                             (Face ID/Apple Pay/Card)
 
-                            ← Confirms payment        ← Takes 15% fee
+                            ← Confirms payment        ← Takes 30% fee
 
 ← "Purchase successful"                              → Deposits to YOU
 ```
@@ -147,7 +137,7 @@ StoreKit Configuration.storekit:
 Real In-App Purchases:
 ✅ Users pay real money
 ✅ You earn real revenue
-✅ Apple takes 15% commission
+✅ Apple takes 30% commission (15% after 1 year or $1M revenue)
 ✅ Money deposited monthly
 ```
 

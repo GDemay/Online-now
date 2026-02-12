@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -43,13 +43,13 @@
 		5516F120678075B92C5D7613 /* OnlineNow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineNow.swift; sourceTree = "<group>"; };
 		55FD7ABF7A13146968713DB6 /* SpeedTestService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTestService.swift; sourceTree = "<group>"; };
 		5932EFD8ABDBD412CDF17DF2 /* TipJarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipJarView.swift; sourceTree = "<group>"; };
-		61055ABB3D0DF27FE036BD32 /* OnlineNow.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OnlineNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		61055ABB3D0DF27FE036BD32 /* OnlineNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OnlineNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		653D91E7640236AF6FD3F7EE /* HistoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryListView.swift; sourceTree = "<group>"; };
 		66743D154A795A73094D51AB /* ConnectivityBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityBanner.swift; sourceTree = "<group>"; };
 		6925BC12715039D51D123A8F /* SharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTypes.swift; sourceTree = "<group>"; };
 		74C4FCECB9E079EE19C205B8 /* LatencyMeasurementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatencyMeasurementService.swift; sourceTree = "<group>"; };
 		791C46F53FEB01D7C2EC4945 /* ConnectivityStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityStatusView.swift; sourceTree = "<group>"; };
-		7BF42FE4F30890F8479A8360 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		7BF42FE4F30890F8479A8360 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		88FF2F3FBDD470EAC346073C /* ReachabilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReachabilityService.swift; sourceTree = "<group>"; };
 		92BA7F140A2FE89E5063C423 /* SupporterViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupporterViews.swift; sourceTree = "<group>"; };
 		970AE6A9605A745B6098389D /* DiagnosticService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticService.swift; sourceTree = "<group>"; };
@@ -199,7 +199,6 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					F0170DDDF482329F9B489E04 = {
-						DevelopmentTeam = MV634X2D7X;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -214,7 +213,6 @@
 			);
 			mainGroup = 534889ECE329A9C5798FC9FA;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -396,8 +394,8 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MV634X2D7X;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = GB87Z9SKC5;
 				ENABLE_BITCODE = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -408,7 +406,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gdemay.onlinenow;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -430,8 +428,8 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MV634X2D7X;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = GB87Z9SKC5;
 				ENABLE_BITCODE = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -442,7 +440,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gdemay.onlinenow;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

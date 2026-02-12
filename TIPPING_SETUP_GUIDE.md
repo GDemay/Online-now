@@ -5,10 +5,9 @@ This guide walks you through setting up Apple Pay tipping in App Store Connect f
 ## 🎯 What's Implemented
 
 The app now includes:
-- ✅ **Three tip tiers**: Small ($2), Medium ($5), Large ($10)
+- ✅ **One donation option**: $1 donation
 - ✅ **Contextual prompts**: After first speed test, frequent use, etc.
-- ✅ **Supporter benefits**: Name in credits, custom icons, beta access
-- ✅ **Beautiful UI**: Modern tip jar with impact messaging
+- ✅ **Beautiful UI**: Modern tip jar with gratitude messaging
 - ✅ **StoreKit 2**: Modern async/await implementation
 - ✅ **Local testing**: Configuration.storekit for Xcode testing
 
@@ -23,52 +22,24 @@ The app now includes:
 3. Click **In-App Purchases** in the left sidebar
 4. Click the **+** button to create a new in-app purchase
 
-### 1.2 Create Small Tip ($2)
+### 1.2 Create Donation Product
 
 1. **Type**: Consumable
-2. **Reference Name**: `Small Tip ($2)`
-3. **Product ID**: `com.gdemay.onlinenow.tip.small`
-4. **Price**: Select **Tier 2** ($1.99 USD)
+2. **Reference Name**: `donation`
+3. **Product ID**: `onlinenow.gdemay`
+4. **Price**: Select **Tier 1** ($0.99 USD)
 5. **Localization** (English - U.S.):
-   - **Display Name**: `Small Tip`
-   - **Description**: `Buy me a coffee! Support development of OnlineNow.`
+   - **Display Name**: `Donation`
+   - **Description**: `Support OnlineNow development with a donation.`
 6. **Review Information**:
    - **Screenshot**: Take a screenshot of the tip jar (use preview mode)
-   - **Review Notes**: "Consumable tip to support app development. No content unlocked."
+   - **Review Notes**: "Consumable donation to support app development. No content unlocked."
 7. Click **Save**
 
-### 1.3 Create Medium Tip ($5)
+### 1.3 Submit Product for Review
 
-1. **Type**: Consumable
-2. **Reference Name**: `Medium Tip ($5)`
-3. **Product ID**: `com.gdemay.onlinenow.tip.medium`
-4. **Price**: Select **Tier 5** ($4.99 USD)
-5. **Localization** (English - U.S.):
-   - **Display Name**: `Medium Tip`
-   - **Description**: `Buy me lunch! Your support means a lot.`
-6. **Review Information**:
-   - **Screenshot**: Same tip jar screenshot
-   - **Review Notes**: "Consumable tip to support app development. Unlocks supporter badge."
-7. Click **Save**
-
-### 1.4 Create Large Tip ($10)
-
-1. **Type**: Consumable
-2. **Reference Name**: `Large Tip ($10)`
-3. **Product ID**: `com.gdemay.onlinenow.tip.large`
-4. **Price**: Select **Tier 10** ($9.99 USD)
-5. **Localization** (English - U.S.):
-   - **Display Name**: `Large Tip`
-   - **Description**: `Generous supporter! Unlock exclusive benefits.`
-6. **Review Information**:
-   - **Screenshot**: Same tip jar screenshot
-   - **Review Notes**: "Consumable tip to support app development. Unlocks power supporter benefits."
-7. Click **Save**
-
-### 1.5 Submit Products for Review
-
-1. For each product, click **Submit for Review**
-2. Products will be reviewed along with your app submission
+1. Click **Submit for Review** on your donation product
+2. The product will be reviewed along with your app submission
 
 ---
 
@@ -82,8 +53,8 @@ The app includes `Configuration.storekit` for local testing:
 2. Run the app in the simulator or on a device
 3. In Xcode menu: **Debug** → **StoreKit** → **Configuration File** → Select `Configuration.storekit`
 4. Tap the coffee cup icon in the app to open the tip jar
-5. Test purchasing all three tip tiers
-6. Verify supporter badges appear correctly
+5. Test purchasing the donation
+6. Verify the thank you message appears
 
 ### 2.2 Test Sandbox Environment
 
@@ -127,13 +98,13 @@ This app includes optional tipping functionality:
 - Three consumable tips: $2, $5, $10
 - Tips support ongoing development
 - No content is locked behind paywalls
-- Supporter benefits are cosmetic (badges, app icons)
+- Donation is pure gratitude, no benefits provided
 
 To test:
 1. Complete a speed test (tap the large logo)
 2. A tip prompt may appear after first speed test
 3. Tap coffee cup icon in top-left to access tip jar
-4. All features work without tipping
+4. All features work without donating
 ```
 
 ### 3.3 Privacy Nutrition Label
@@ -157,7 +128,7 @@ Apple requires screenshots of in-app purchases:
 1. Run the app in simulator (iPhone 15 Pro)
 2. Tap the coffee cup icon in top-left
 3. Take a screenshot (Cmd+S)
-4. Upload to each in-app purchase product
+4. Upload to the in-app purchase product
 
 ### 4.2 Screenshot After Purchase
 
@@ -175,7 +146,7 @@ After launch, monitor tipping performance:
 
 1. **Sales and Trends** → Filter by **In-App Purchases**
 2. Monitor conversion rates
-3. Track which tip tier is most popular
+3. Track total donations received
 
 ### Track in Analytics (Optional Enhancement)
 
@@ -189,26 +160,19 @@ Consider adding analytics to track:
 
 ## 💡 Tips for Success
 
-### Maximize Tip Conversions
+### Maximize Donations
 
 1. **Timing is everything**: Prompts appear after positive moments (successful speed test)
-2. **Show value first**: Users see the app's value before being asked to tip
-3. **Make it optional**: Never block features behind tips
-4. **Show impact**: "Your tip helps fund ISP comparison features"
-5. **Reward supporters**: Badges and benefits create social proof
+2. **Show value first**: Users see the app's value before being asked to donate
+3. **Make it optional**: Never block features behind donations
+4. **Show gratitude**: "Thanks for supporting OnlineNow development"
 
-### Supporter Benefits Roadmap
+### Future Enhancements
 
-Current benefits:
-- ✅ Name in credits (coming soon)
-- ✅ Supporter badges
-- 🔜 Custom app icons (implement next)
-- 🔜 Beta feature access
-
-To implement custom app icons:
-1. Add alternate app icons to Assets.xcassets
-2. Update Info.plist with `CFBundleIcons`
-3. Add icon picker in settings
+Consider adding:
+- 🔜 Multiple donation tiers ($1, $5, $10)
+- 🔜 Custom app icons for supporters
+- 🔜 Name in credits section
 
 ### Future Monetization
 
@@ -256,14 +220,13 @@ If you encounter issues:
 
 Before submitting to App Store:
 
-- [ ] All three tip products created in App Store Connect
-- [ ] Products submitted for review
+- [ ] Donation product created in App Store Connect (ID: onlinenow.gdemay)
+- [ ] Product submitted for review
 - [ ] Tested with Configuration.storekit locally
 - [ ] Tested with sandbox account
-- [ ] Screenshots taken for each product
-- [ ] App description updated with tipping info
+- [ ] Screenshot taken for the product
+- [ ] App description mentions donations (optional)
 - [ ] Privacy nutrition label updated
 - [ ] App review notes include purchase testing instructions
-- [ ] Supporter benefits clearly communicated
 
 **You're ready to launch! 🚀**
