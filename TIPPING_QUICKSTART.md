@@ -109,7 +109,7 @@ Based on industry benchmarks:
 
 If donations perform well, expand to multiple options:
 - **Small**: $1 (current)
-- **Medium**: $5 
+- **Medium**: $5
 - **Large**: $10
 
 ### Potential Supporter Benefits
