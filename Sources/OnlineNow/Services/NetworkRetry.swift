@@ -3,7 +3,7 @@ import Combine
 
 /// Configuration for network retry behavior
 public struct NetworkRetryConfiguration: Sendable {
-    /// Maximum number of retry attempts
+    /// Maximum number of attempts, including the initial attempt
     public let maxRetries: Int
 
     /// Base delay between retries (exponential backoff applied)
@@ -25,11 +25,12 @@ public struct NetworkRetryConfiguration: Sendable {
         waitForConnectivity: Bool = true,
         timeout: TimeInterval? = nil
     ) {
-        self.maxRetries = maxRetries
-        self.baseDelay = baseDelay
-        self.maxDelay = maxDelay
+        // Keep invalid input from producing an invalid range or a UInt64 conversion trap.
+        self.maxRetries = max(1, maxRetries)
+        self.baseDelay = baseDelay.isFinite ? max(0, baseDelay) : 0
+        self.maxDelay = maxDelay.isFinite ? max(0, maxDelay) : 30
         self.waitForConnectivity = waitForConnectivity
-        self.timeout = timeout
+        self.timeout = timeout.map { $0.isFinite ? max(0, $0) : 0 }
     }
 
     /// Default configuration for quick operations
@@ -41,7 +42,8 @@ public struct NetworkRetryConfiguration: Sendable {
         timeout: 30
     )
 
-    /// Configuration for critical operations (payments, sync)
+    /// Configuration for operations that can safely be repeated.
+    /// Use an idempotency key for remote writes; never retry an unprotected payment.
     public static let critical = NetworkRetryConfiguration(
         maxRetries: 5,
         baseDelay: 1.0,
@@ -126,260 +128,202 @@ public struct QueuedOperation<T: Sendable>: Identifiable, Sendable {
     }
 }
 
-/// Network retry helper that automatically queues and retries operations
-/// when connectivity is restored
+/// Retries operations that are safe to repeat, including while waiting for connectivity.
+/// Operations must cooperate with Swift task cancellation (as URLSession does) so a
+/// timeout or cancellation can stop in-flight work. Remote writes need idempotency.
 @available(iOS 15.0, macOS 12.0, watchOS 8.0, *)
 public actor NetworkRetry {
-
-    // MARK: - Properties
-
-    private let reachabilityService: ReachabilityService
-    private var pendingOperations: [UUID: any QueuedOperationProtocol] = [:]
-    private var connectivityTask: Task<Void, Never>?
-    private var isMonitoring = false
-
-    /// Publisher for operation queue changes - use from actor context
+    private let reachabilityService: any ReachabilityChecking
+    private var pendingOperations: [UUID: PendingOperation] = [:]
     private let queueSubject = PassthroughSubject<Int, Never>()
 
-    /// Get a publisher for queue count changes
-    /// Note: Access this property from actor context or use async access
     public var queueCountPublisher: AnyPublisher<Int, Never> {
         queueSubject.eraseToAnyPublisher()
     }
 
-    /// Current number of queued operations
-    public var queuedCount: Int {
-        pendingOperations.count
-    }
+    public var queuedCount: Int { pendingOperations.count }
 
-    // MARK: - Initialization
-
-    public init(reachabilityService: ReachabilityService = ReachabilityService()) {
+    public init(reachabilityService: any ReachabilityChecking = ReachabilityService()) {
         self.reachabilityService = reachabilityService
     }
 
-    // MARK: - Public Methods
+    deinit {
+        for operation in pendingOperations.values { operation.task?.cancel() }
+    }
 
-    /// Execute an operation with automatic retry on failure
-    /// - Parameters:
-    ///   - description: Human-readable description of the operation
-    ///   - configuration: Retry configuration
-    ///   - operation: The async operation to execute
-    /// - Returns: Result of the operation
+    /// Execute with a single timeout budget covering connectivity, attempts, and backoff.
     public func execute<T: Sendable>(
         description: String,
         configuration: NetworkRetryConfiguration = .quick,
         operation: @escaping @Sendable () async throws -> T
     ) async -> NetworkRetryResult<T> {
-
-        // First, check if we have connectivity
-        let reachability = await reachabilityService.checkReachability()
-
-        if !reachability.isReachable && configuration.waitForConnectivity {
-            // Queue the operation and wait for connectivity
-            return await queueAndWait(
-                description: description,
-                configuration: configuration,
-                operation: operation
-            )
-        }
-
-        // Attempt the operation with retries
-        return await executeWithRetry(
-            configuration: configuration,
-            operation: operation
-        )
+        await Self.performExecution(
+            reachabilityService: reachabilityService, configuration: configuration,
+            operation: operation)
     }
 
-    /// Queue an operation to be executed when connectivity returns
-    /// Returns immediately with the operation ID for tracking
-    /// - Parameters:
-    ///   - description: Human-readable description
-    ///   - configuration: Retry configuration
-    ///   - operation: The async operation to queue
-    /// - Returns: The operation ID for tracking
+    private static func performExecution<T: Sendable>(
+        reachabilityService: any ReachabilityChecking,
+        configuration: NetworkRetryConfiguration,
+        operation: @escaping @Sendable () async throws -> T
+    ) async -> NetworkRetryResult<T> {
+        guard !Task.isCancelled else { return .failure(.cancelled) }
+        guard let timeout = configuration.timeout else {
+            return await executeWithRetry(
+                reachabilityService: reachabilityService, configuration: configuration,
+                operation: operation)
+        }
+        guard timeout > 0 else { return .failure(.timeout) }
+
+        return await withTaskGroup(of: NetworkRetryResult<T>.self) { group in
+            group.addTask {
+                await executeWithRetry(
+                    reachabilityService: reachabilityService, configuration: configuration,
+                    operation: operation)
+            }
+            group.addTask {
+                do {
+                    try await Self.sleep(seconds: timeout)
+                    return .failure(.timeout)
+                } catch {
+                    return .failure(.cancelled)
+                }
+            }
+            let result = await group.next() ?? .failure(.cancelled)
+            group.cancelAll()
+            return result
+        }
+    }
+
+    /// Queue an operation using the same cancellation, retry, and timeout rules as execute.
+    /// Each monitoring period includes connectivity waiting in its timeout budget.
+    @discardableResult
     public func queue<T: Sendable>(
         description: String,
         configuration: NetworkRetryConfiguration = .quick,
         operation: @escaping @Sendable () async throws -> T
     ) -> UUID {
-        let queuedOp = QueuedOperation(
-            description: description,
-            configuration: configuration,
-            operation: operation
-        )
-
-        let wrapper = QueuedOperationWrapper(operation: queuedOp)
-        pendingOperations[queuedOp.id] = wrapper
+        let id = UUID()
+        let reachability = reachabilityService
+        pendingOperations[id] = PendingOperation(run: {
+            _ = await Self.performExecution(
+                reachabilityService: reachability, configuration: configuration, operation: operation)
+        })
         queueSubject.send(pendingOperations.count)
-
         startMonitoringIfNeeded()
-
-        return queuedOp.id
+        return id
     }
 
-    /// Cancel a queued operation
-    /// - Parameter id: The operation ID to cancel
-    /// - Returns: True if the operation was found and cancelled
+    /// Cancel queued or in-flight work. Cancellation prevents any later retry attempt.
     @discardableResult
     public func cancel(operationId id: UUID) -> Bool {
-        if pendingOperations.removeValue(forKey: id) != nil {
-            queueSubject.send(pendingOperations.count)
-            return true
-        }
-        return false
+        guard let operation = pendingOperations.removeValue(forKey: id) else { return false }
+        operation.task?.cancel()
+        queueSubject.send(pendingOperations.count)
+        return true
     }
 
-    /// Cancel all queued operations
     public func cancelAll() {
+        let operations = pendingOperations.values
         pendingOperations.removeAll()
+        for operation in operations { operation.task?.cancel() }
         queueSubject.send(0)
-        stopMonitoring()
     }
 
-    /// Start monitoring for connectivity to process queued operations
+    /// Resume monitoring queued operations after an explicit stop.
     public func startMonitoringIfNeeded() {
-        guard !isMonitoring && !pendingOperations.isEmpty else { return }
-
-        isMonitoring = true
-        connectivityTask = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self = self else { break }
-
-                let reachability = await self.reachabilityService.checkReachability()
-
-                if reachability.isReachable {
-                    await self.processQueuedOperations()
-                }
-
-                // Check every 2 seconds
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+        guard !pendingOperations.isEmpty else { return }
+        for id in Array(pendingOperations.keys) {
+            guard var operation = pendingOperations[id], operation.task == nil else { continue }
+            let generation = UUID()
+            operation.generation = generation
+            let run = operation.run
+            operation.task = Task { [weak self] in
+                guard !Task.isCancelled else { return }
+                await run()
+                await self?.didFinish(id: id, generation: generation)
             }
+            pendingOperations[id] = operation
         }
     }
 
-    /// Stop monitoring for connectivity
+    /// Stop queued work. Entries remain available for explicit resumption.
     public func stopMonitoring() {
-        connectivityTask?.cancel()
-        connectivityTask = nil
-        isMonitoring = false
-    }
-
-    // MARK: - Private Methods
-
-    private func queueAndWait<T: Sendable>(
-        description: String,
-        configuration: NetworkRetryConfiguration,
-        operation: @escaping @Sendable () async throws -> T
-    ) async -> NetworkRetryResult<T> {
-
-        // Create a continuation to wait for the result
-        return await withCheckedContinuation { continuation in
-            let wrappedOperation: @Sendable () async throws -> T = {
-                let result = try await operation()
-                return result
-            }
-
-            Task {
-                // Poll for connectivity
-                var waited: TimeInterval = 0
-                let pollInterval: TimeInterval = 1.0
-
-                while waited < (configuration.timeout ?? .infinity) {
-                    let reachability = await self.reachabilityService.checkReachability()
-
-                    if reachability.isReachable {
-                        let result = await self.executeWithRetry(
-                            configuration: configuration,
-                            operation: wrappedOperation
-                        )
-                        continuation.resume(returning: result)
-                        return
-                    }
-
-                    try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
-                    waited += pollInterval
-                }
-
-                continuation.resume(returning: .failure(.timeout))
-            }
+        for id in Array(pendingOperations.keys) {
+            guard var operation = pendingOperations[id] else { continue }
+            operation.task?.cancel()
+            operation.task = nil
+            operation.generation = UUID()
+            pendingOperations[id] = operation
         }
     }
 
-    private func executeWithRetry<T: Sendable>(
+    private func didFinish(id: UUID, generation: UUID) {
+        // An old cancelled worker must never remove a newly resumed entry.
+        guard pendingOperations[id]?.generation == generation else { return }
+        pendingOperations.removeValue(forKey: id)
+        queueSubject.send(pendingOperations.count)
+    }
+
+    private static func executeWithRetry<T: Sendable>(
+        reachabilityService: any ReachabilityChecking,
         configuration: NetworkRetryConfiguration,
         operation: @escaping @Sendable () async throws -> T
     ) async -> NetworkRetryResult<T> {
-
         var lastError: Error?
-        var currentDelay = configuration.baseDelay
-
+        var delay = min(configuration.baseDelay, configuration.maxDelay)
         for attempt in 1...configuration.maxRetries {
             do {
-                let result = try await operation()
-                return .success(result)
-            } catch {
-                lastError = error
-
-                // Check if this is the last attempt
-                if attempt == configuration.maxRetries {
-                    break
-                }
-
-                // Wait before retrying (exponential backoff)
-                try? await Task.sleep(nanoseconds: UInt64(currentDelay * 1_000_000_000))
-                currentDelay = min(currentDelay * 2, configuration.maxDelay)
-
-                // If configured to wait for connectivity, check before retrying
+                try Task.checkCancellation()
                 if configuration.waitForConnectivity {
-                    let reachability = await reachabilityService.checkReachability()
-                    if !reachability.isReachable {
-                        // Wait for connectivity
-                        while true {
-                            try? await Task.sleep(nanoseconds: 1_000_000_000)
-                            let check = await reachabilityService.checkReachability()
-                            if check.isReachable { break }
-                        }
-                    }
+                    try await waitForConnectivity(using: reachabilityService)
                 }
+                try Task.checkCancellation()
+                let result = try await operation()
+                try Task.checkCancellation()
+                return .success(result)
+            } catch is CancellationError {
+                return .failure(.cancelled)
+            } catch {
+                guard !Task.isCancelled else { return .failure(.cancelled) }
+                lastError = error
+                guard attempt < configuration.maxRetries else { break }
+                do {
+                    try await Self.sleep(seconds: delay)
+                } catch {
+                    return .failure(.cancelled)
+                }
+                delay = min(delay * 2, configuration.maxDelay)
             }
         }
-
         return .failure(.maxRetriesExceeded(attempts: configuration.maxRetries, lastError: lastError))
     }
 
-    private func processQueuedOperations() async {
-        let operations = pendingOperations
-
-        for (id, wrapper) in operations {
-            await wrapper.execute()
-            pendingOperations.removeValue(forKey: id)
-            queueSubject.send(pendingOperations.count)
-        }
-
-        if pendingOperations.isEmpty {
-            stopMonitoring()
+    private static func waitForConnectivity(using reachabilityService: any ReachabilityChecking) async throws {
+        while true {
+            try Task.checkCancellation()
+            let result = await reachabilityService.checkReachability()
+            try Task.checkCancellation()
+            if result.isReachable { return }
+            try await Self.sleep(seconds: 1)
         }
     }
-}
 
-// MARK: - Internal Helpers
+    private static func sleep(seconds: TimeInterval) async throws {
+        // Chunk long waits so large (but finite) input cannot overflow nanoseconds.
+        var remaining = seconds
+        repeat {
+            try Task.checkCancellation()
+            let interval = min(remaining, 3_600)
+            try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+            remaining -= interval
+        } while remaining > 0
+    }
 
-/// Protocol for type-erased queued operations
-private protocol QueuedOperationProtocol: Sendable {
-    func execute() async
-}
-
-/// Wrapper to type-erase QueuedOperation
-private struct QueuedOperationWrapper<T: Sendable>: QueuedOperationProtocol, Sendable {
-    let operation: QueuedOperation<T>
-
-    func execute() async {
-        do {
-            _ = try await operation.operation()
-        } catch {
-            // Operation failed, could add callback here
-        }
+    private struct PendingOperation {
+        let run: @Sendable () async -> Void
+        var generation = UUID()
+        var task: Task<Void, Never>?
     }
 }
 

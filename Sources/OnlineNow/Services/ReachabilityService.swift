@@ -35,234 +35,170 @@ public struct CaptivePortalResult: Sendable {
 
 // MARK: - Reachability Service
 
-/// Enhanced service to verify actual internet reachability and detect captive portals
-/// Uses multiple reliable endpoints for verification with fallback mechanisms
+/// Verifies an uncached, expected response from independent HTTPS providers.
+/// Redirects and login pages are not evidence of internet access.
 @available(iOS 15.0, macOS 12.0, watchOS 8.0, *)
 public actor ReachabilityService: ReachabilityChecking {
-
-    // MARK: - Captive Portal Detection Endpoints
-
-    /// Apple's captive portal detection endpoint
-    /// Returns specific text "Success" when not behind a captive portal
-    private let appleCaptiveURL = URL(string: "http://captive.apple.com/hotspot-detect.html")!
-    private let appleExpectedResponse = "Success"
-
-    // MARK: - Internet Reachability Endpoints
-
-    /// Primary URL - Google's connectivity check (very reliable, returns 204)
-    private let primaryURL = URL(string: "https://www.google.com/generate_204")!
-
-    /// Fallback URL - Cloudflare trace
-    private let fallbackURL = URL(string: "https://cloudflare.com/cdn-cgi/trace")!
-
-    /// Third fallback - Apple's secure endpoint
-    private let tertiaryURL = URL(string: "https://www.apple.com/library/test/success.html")!
-
-    // MARK: - Configuration
-
-    /// Timeout for reachability checks (seconds)
-    private let timeout: TimeInterval
-
-    /// Maximum retry attempts per endpoint
     private let maxRetries: Int
-
-    /// Whether to perform captive portal detection
     private let detectCaptivePortals: Bool
+    private let session: URLSession
 
-    // MARK: - Initialization
-
-    public init(
-        timeout: TimeInterval = 5,
-        maxRetries: Int = 1,
-        detectCaptivePortals: Bool = true
-    ) {
-        self.timeout = timeout
-        self.maxRetries = maxRetries
+    public init(timeout: TimeInterval = 5, maxRetries: Int = 1,
+                detectCaptivePortals: Bool = true) {
+        self.maxRetries = min(3, max(1, maxRetries))
         self.detectCaptivePortals = detectCaptivePortals
+        let configuration = Self.configuration(timeout: timeout)
+        session = URLSession(configuration: configuration, delegate: ConnectivityRedirectDelegate(), delegateQueue: nil)
     }
 
-    // MARK: - ReachabilityChecking Protocol
+    /// Test seam for deterministic URLProtocol responses; never used by production.
+    init(configuration: URLSessionConfiguration, maxRetries: Int = 1,
+         detectCaptivePortals: Bool = true) {
+        self.maxRetries = min(3, max(1, maxRetries))
+        self.detectCaptivePortals = detectCaptivePortals
+        session = URLSession(configuration: configuration, delegate: ConnectivityRedirectDelegate(), delegateQueue: nil)
+    }
 
-    /// Verifies if the internet is actually reachable
-    /// - Returns: ReachabilityResult with status and latency
+    deinit { session.invalidateAndCancel() }
+
     public func checkReachability() async -> ReachabilityResult {
-        let startTime = Date()
-
-        // Try primary URL first (Google - most reliable, 204 response)
-        if let result = await performCheck(
-            url: primaryURL, startTime: startTime, expectedStatus: 204)
-        {
-            return result
-        }
-
-        // Try fallback URL (Cloudflare)
-        if let result = await performCheck(
-            url: fallbackURL, startTime: startTime, expectedStatus: nil)
-        {
-            return result
-        }
-
-        // Try tertiary URL (Apple)
-        if let result = await performCheck(
-            url: tertiaryURL, startTime: startTime, expectedStatus: nil)
-        {
-            return result
-        }
-
-        // All attempts failed
-        let elapsed = Date().timeIntervalSince(startTime) * 1000
-        return ReachabilityResult(
-            isReachable: false,
-            responseTimeMs: elapsed,
-            error: "Unable to reach internet"
-        )
-    }
-
-    /// Detects if the device is behind a captive portal
-    /// Uses Apple's captive portal detection endpoint which returns specific content
-    /// - Returns: CaptivePortalResult indicating captive portal status
-    public func detectCaptivePortal() async -> CaptivePortalResult {
-        guard detectCaptivePortals else {
-            return .noCaptivePortal
-        }
-
-        let config = createSessionConfig()
-        let session = URLSession(configuration: config)
-        defer { session.invalidateAndCancel() }
-
-        do {
-            // Use HTTP endpoint - captive portals typically redirect HTTP requests
-            var request = URLRequest(url: appleCaptiveURL)
-            request.httpMethod = "GET"
-            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-
-            let (data, response) = try await session.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                return CaptivePortalResult(isCaptivePortal: false, error: "Invalid response")
-            }
-
-            // Check for redirect (common captive portal behavior)
-            if (300...399).contains(httpResponse.statusCode) {
-                let portalURL = httpResponse.url
-                return CaptivePortalResult(
-                    isCaptivePortal: true,
-                    portalURL: portalURL,
-                    error: nil
-                )
-            }
-
-            // Check if response content matches expected
-            if httpResponse.statusCode == 200 {
-                let responseString = String(data: data, encoding: .utf8) ?? ""
-
-                // Apple's endpoint returns HTML containing "Success"
-                if responseString.contains(appleExpectedResponse) {
-                    return .noCaptivePortal
-                } else {
-                    // Got 200 but different content - likely captive portal injection
-                    return CaptivePortalResult(
-                        isCaptivePortal: true,
-                        portalURL: httpResponse.url,
-                        error: nil
-                    )
+        let start = ProcessInfo.processInfo.systemUptime
+        let endpoints = [
+            URL(string: "https://www.google.com/generate_204")!,
+            URL(string: "https://cloudflare.com/cdn-cgi/trace")!,
+            URL(string: "https://www.apple.com/library/test/success.html")!
+        ]
+        for url in endpoints {
+            for attempt in 0..<maxRetries {
+                guard !Task.isCancelled else { return cancelledResult() }
+                let checkStart = ProcessInfo.processInfo.systemUptime
+                do {
+                    var request = URLRequest(url: url)
+                    request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+                    let (data, response) = try await session.data(for: request)
+                    guard !Task.isCancelled else { return cancelledResult() }
+                    if Self.isExpectedInternetResponse(data: data, response: response, for: url) {
+                        return ReachabilityResult(isReachable: true,
+                            responseTimeMs: (ProcessInfo.processInfo.systemUptime - checkStart) * 1000,
+                            error: nil)
+                    }
+                } catch {
+                    if Task.isCancelled || (error as? URLError)?.code == .cancelled {
+                        return cancelledResult()
+                    }
+                }
+                if attempt + 1 < maxRetries {
+                    do { try await Task.sleep(nanoseconds: 200_000_000) }
+                    catch { return cancelledResult() }
                 }
             }
+        }
+        return ReachabilityResult(isReachable: false,
+            responseTimeMs: (ProcessInfo.processInfo.systemUptime - start) * 1000,
+            error: "Unable to reach internet")
+    }
 
-            // Any other status code - inconclusive but likely not captive portal
-            return .noCaptivePortal
-
-        } catch let error as URLError {
-            return CaptivePortalResult(
-                isCaptivePortal: false,
-                error: error.localizedDescription
-            )
+    public func detectCaptivePortal() async -> CaptivePortalResult {
+        guard detectCaptivePortals else { return .noCaptivePortal }
+        guard !Task.isCancelled else {
+            return CaptivePortalResult(isCaptivePortal: false, error: "Check cancelled")
+        }
+        let url = URL(string: "http://captive.apple.com/hotspot-detect.html")!
+        do {
+            var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            let (data, response) = try await session.data(for: request)
+            guard !Task.isCancelled else {
+                return CaptivePortalResult(isCaptivePortal: false, error: "Check cancelled")
+            }
+            return Self.captivePortalResult(data: data, response: response, requestedURL: url)
         } catch {
-            return CaptivePortalResult(
-                isCaptivePortal: false,
-                error: error.localizedDescription
-            )
+            return CaptivePortalResult(isCaptivePortal: false, error: error.localizedDescription)
         }
     }
 
-    /// Performs comprehensive connectivity check including captive portal detection
-    /// - Returns: Tuple of reachability result and captive portal result
+    /// HTTPS reachability takes priority; a broken HTTP probe alone cannot mark a
+    /// working connection offline. Only investigate portals if HTTPS probes fail.
     public func checkConnectivity() async -> (
         reachability: ReachabilityResult, captivePortal: CaptivePortalResult
     ) {
-        // First check for captive portal (faster, uses HTTP)
-        let captiveResult = await detectCaptivePortal()
-
-        // If behind captive portal, internet is not truly reachable
-        if captiveResult.isCaptivePortal {
-            return (
-                ReachabilityResult(
-                    isReachable: false, responseTimeMs: 0, error: "Behind captive portal"),
-                captiveResult
-            )
+        let reachability = await checkReachability()
+        guard !reachability.isReachable, !Task.isCancelled else {
+            return (reachability, .noCaptivePortal)
         }
-
-        // Check actual internet reachability
-        let reachabilityResult = await checkReachability()
-
-        return (reachabilityResult, captiveResult)
+        return (reachability, await detectCaptivePortal())
     }
 
-    // MARK: - Private Methods
+    static func isExpectedInternetResponse(data: Data, response: URLResponse, for url: URL) -> Bool {
+        guard let http = response as? HTTPURLResponse,
+              http.url?.scheme == "https", http.url?.host == url.host,
+              http.url?.path == url.path else { return false }
+        switch url.host {
+        case "www.google.com":
+            return http.statusCode == 204 && data.isEmpty
+        case "cloudflare.com":
+            guard http.statusCode == 200,
+                  let body = String(data: data, encoding: .utf8) else { return false }
+            let lines = body.split(separator: "\n")
+            return lines.contains { $0.hasPrefix("ip=") } && lines.contains { $0.hasPrefix("h=") }
+        case "www.apple.com":
+            return http.statusCode == 200 && isAppleSuccess(data)
+        default:
+            return false
+        }
+    }
 
-    private func createSessionConfig() -> URLSessionConfiguration {
+    static func captivePortalResult(data: Data, response: URLResponse,
+                                    requestedURL: URL) -> CaptivePortalResult {
+        guard let http = response as? HTTPURLResponse else {
+            return CaptivePortalResult(isCaptivePortal: false, error: "Invalid response")
+        }
+        if (300...399).contains(http.statusCode) {
+            let destination = http.value(forHTTPHeaderField: "Location")
+                .flatMap { URL(string: $0, relativeTo: requestedURL)?.absoluteURL }
+            let safeURL = destination.flatMap { ["http", "https"].contains($0.scheme?.lowercased() ?? "") ? $0 : nil }
+            return CaptivePortalResult(isCaptivePortal: true, portalURL: safeURL)
+        }
+        if http.statusCode == 200 {
+            return isAppleSuccess(data) ? .noCaptivePortal :
+                CaptivePortalResult(isCaptivePortal: true, portalURL: http.url)
+        }
+        if http.statusCode == 511 {
+            return CaptivePortalResult(isCaptivePortal: true, portalURL: http.url)
+        }
+        return CaptivePortalResult(isCaptivePortal: false,
+                                   error: "Captive portal check was inconclusive (HTTP \(http.statusCode))")
+    }
+
+    private static func isAppleSuccess(_ data: Data) -> Bool {
+        guard let body = String(data: data, encoding: .utf8)?.lowercased() else { return false }
+        return body.contains("<title>success</title>") && body.contains("<body>success</body>")
+    }
+
+    private static func configuration(timeout: TimeInterval) -> URLSessionConfiguration {
         let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = timeout
-        config.timeoutIntervalForResource = timeout
+        let boundedTimeout = timeout.isFinite ? min(30, max(0.1, timeout)) : 5
+        config.timeoutIntervalForRequest = boundedTimeout
+        config.timeoutIntervalForResource = boundedTimeout
         config.waitsForConnectivity = false
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         config.urlCache = nil
         return config
     }
 
-    private func performCheck(url: URL, startTime: Date, expectedStatus: Int?) async
-        -> ReachabilityResult?
-    {
-        for attempt in 0..<maxRetries {
-            do {
-                let config = createSessionConfig()
-                let session = URLSession(configuration: config)
-                defer { session.invalidateAndCancel() }
+    private func cancelledResult() -> ReachabilityResult {
+        ReachabilityResult(isReachable: false, responseTimeMs: 0, error: "Check cancelled")
+    }
+}
 
-                let checkStart = Date()
-
-                // Use HEAD request for faster checks when possible
-                var request = URLRequest(url: url)
-                request.httpMethod = expectedStatus == 204 ? "GET" : "HEAD"
-
-                let (_, response) = try await session.data(for: request)
-
-                if let httpResponse = response as? HTTPURLResponse {
-                    let isSuccess: Bool
-                    if let expected = expectedStatus {
-                        isSuccess = httpResponse.statusCode == expected
-                    } else {
-                        isSuccess = (200...399).contains(httpResponse.statusCode)
-                    }
-
-                    if isSuccess {
-                        let responseTime = Date().timeIntervalSince(checkStart) * 1000
-                        return ReachabilityResult(
-                            isReachable: true,
-                            responseTimeMs: responseTime,
-                            error: nil
-                        )
-                    }
-                }
-            } catch {
-                // Brief delay before retry
-                if attempt < maxRetries - 1 {
-                    try? await Task.sleep(nanoseconds: 200_000_000)  // 0.2s
-                }
-            }
-        }
-
-        return nil
+/// Following a captive-portal redirect can turn its login page into an apparent
+/// successful internet response. Return the original redirect to the caller.
+private final class ConnectivityRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
     }
 }
 

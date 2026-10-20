@@ -19,6 +19,7 @@ public final class ConnectivityViewModel: ObservableObject {
 
     /// Toggle between preview states for screenshots
     public func cyclePreviewState() {
+        #if DEBUG
         let states: [AppState] = [
             .online, .offline, .limitedConnectivity, .checking, .measuringSpeed,
         ]
@@ -33,9 +34,11 @@ public final class ConnectivityViewModel: ObservableObject {
         if isPreviewMode {
             applyPreviewState()
         }
+        #endif
     }
 
     /// Apply preview state values for screenshots
+    #if DEBUG
     private func applyPreviewState() {
         switch previewState {
         case .online:
@@ -90,8 +93,11 @@ public final class ConnectivityViewModel: ObservableObject {
         }
     }
 
+    #endif
+
     /// Toggle preview mode on/off
     public func togglePreviewMode() {
+        #if DEBUG
         isPreviewMode.toggle()
         if isPreviewMode {
             // Stop real monitoring
@@ -103,6 +109,7 @@ public final class ConnectivityViewModel: ObservableObject {
             startMonitoring()
             print("📸 PREVIEW MODE OFF - Resuming real network monitoring")
         }
+        #endif
     }
 
     // MARK: - Published State
@@ -159,182 +166,100 @@ public final class ConnectivityViewModel: ObservableObject {
     /// Latest diagnostic results
     @Published public private(set) var diagnosticResults: [DiagnosticResult] = []
 
-    // MARK: - Services
+    // MARK: - Services and operation lifetime
 
     private let networkMonitor: NetworkMonitor
-    private let reachabilityService: ReachabilityService
-    private let speedTestService: SpeedTestService
-    private let latencyService: LatencyMeasurementService
     private let diagnosticService: DiagnosticService
     public let historyManager: HistoryManager
     public let tippingManager: TippingManager
 
-    // MARK: - Timers
+    // Internal closures allow deterministic lifecycle tests without live network traffic.
+    var reachabilityCheck: @MainActor () async -> ReachabilityResult
+    var latencyMeasurement: @MainActor () async -> LatencyResult
+    var speedMeasurement: @MainActor () async -> SpeedTestResult
+    var endpointCheck: @MainActor (String) async -> Bool
 
     private var reachabilityTimer: Timer?
-    private var speedTestTimer: Timer?
-    private var isPerformingCheck: Bool = false
-    private var isPerformingSpeedTest: Bool = false
+    private var checkTask: Task<Void, Never>?
+    private var operationID = UUID()
+    private var usesOfflineFixture = false
+    @Published public private(set) var isMonitoring = false
+    @Published public private(set) var isPerformingCheck = false
+    @Published public private(set) var isPerformingSpeedTest = false
+    @Published public private(set) var isConstrained = false
+    @Published public private(set) var isExpensive = false
+    private var cancellables = Set<Combine.AnyCancellable>()
 
-    // MARK: - Initialization
+    public convenience init() {
+        self.init(networkMonitor: NetworkMonitor())
+    }
 
-    public init() {
-        self.networkMonitor = NetworkMonitor()
-        self.reachabilityService = ReachabilityService()
-        self.speedTestService = SpeedTestService()
-        self.latencyService = LatencyMeasurementService()
-        self.diagnosticService = DiagnosticService()
-        self.historyManager = HistoryManager()
-        self.tippingManager = TippingManager()
-
+    init(networkMonitor: NetworkMonitor, tippingManager: TippingManager? = nil) {
+        self.networkMonitor = networkMonitor
+        diagnosticService = DiagnosticService()
+        historyManager = HistoryManager()
+        self.tippingManager = tippingManager ?? TippingManager()
+        let reachability = ReachabilityService()
+        let latency = LatencyMeasurementService()
+        let speed = SpeedTestService()
+        reachabilityCheck = { await reachability.checkReachability() }
+        latencyMeasurement = { await latency.measureTCPLatency(to: .cloudflare) }
+        speedMeasurement = { await speed.measureSpeed(quick: false) }
+        endpointCheck = { await Self.checkEndpointReachable(urlString: $0) }
+        #if DEBUG
+        usesOfflineFixture = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+            && ProcessInfo.processInfo.arguments.contains("--offline")
+        #endif
         setupNetworkMonitorObservation()
+        historyManager.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+        tippingManager.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
     }
 
-    // MARK: - Public Methods
-
-    /// Starts monitoring network connectivity with real-time checks
-    public func startMonitoring() {
-        networkMonitor.start()
-        startRealtimeChecks()
-    }
-
-    /// Stops monitoring network connectivity
-    public func stopMonitoring() {
-        networkMonitor.stop()
-        stopRealtimeChecks()
-    }
-
-    /// Start real-time connectivity and speed checks
-    private func startRealtimeChecks() {
-        // Initial check
-        Task {
-            await performRealtimeCheck()
-        }
-
-        // Reachability check every 10 seconds (reduced frequency to save data)
-        reachabilityTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) {
-            [weak self] _ in
-            Task { @MainActor [weak self] in
-                await self?.performRealtimeCheck()
-            }
-        }
-
-        // Speed test every 2 minutes (reduced frequency to save data - uses ~10KB per test)
-        speedTestTimer = Timer.scheduledTimer(withTimeInterval: 120.0, repeats: true) {
-            [weak self] _ in
-            Task { @MainActor [weak self] in
-                await self?.performBackgroundSpeedTest()
-            }
-        }
-
-        // Run initial speed test after 3 seconds
-        Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            await performBackgroundSpeedTest()
-        }
-    }
-
-    /// Stop real-time checks
-    private func stopRealtimeChecks() {
+    deinit {
         reachabilityTimer?.invalidate()
-        reachabilityTimer = nil
-        speedTestTimer?.invalidate()
-        speedTestTimer = nil
+        checkTask?.cancel()
     }
 
-    /// Performs a lightweight reachability check (no speed test)
-    private func performRealtimeCheck() async {
-        guard !isPerformingCheck else { return }
-        isPerformingCheck = true
-        defer { isPerformingCheck = false }
-
-        // Debug: Log network monitor state
-        print("🔍 NetworkMonitor state - isConnected: \(isConnected), type: \(connectionType)")
-
-        // Only check if network monitor says we're connected
-        guard isConnected else {
-            isReachable = false
-            isGoogleReachable = false
-            isCloudflareReachable = false
-            signalQuality = "No Signal"
-            updateState()
+    /// Monitoring runs only while the screen is active. Speed tests are always explicit.
+    public func startMonitoring() {
+        guard !isMonitoring, !isPreviewMode else { return }
+        isMonitoring = true
+        state = .checking
+        if usesOfflineFixture {
+            applyNetworkSnapshot(NetworkPathSnapshot(
+                isConnected: false, connectionType: .none, isVPNActive: false,
+                isConstrained: false, isExpensive: false
+            ))
             return
         }
-
-        // Check main reachability
-        print("🌐 Performing reachability check...")
-        let reachabilityResult = await reachabilityService.checkReachability()
-        print(
-            "✅ Reachability result: \(reachabilityResult.isReachable), response time: \(reachabilityResult.responseTimeMs)ms, error: \(reachabilityResult.error ?? "none")"
-        )
-
-        isReachable = reachabilityResult.isReachable
-        responseTimeMs = reachabilityResult.responseTimeMs
-        latencyMs = reachabilityResult.responseTimeMs  // For backward compatibility
-        lastCheckTime = Date()
-
-        // Measure true network latency (RTT) using TCP
-        let latencyResult = await latencyService.measureTCPLatency(to: .cloudflare)
-        rttMs = latencyResult.rttMs
-        print("📡 TCP latency: \(latencyResult.formattedLatency) to \(latencyResult.endpoint)")
-
-        // If reachability check failed but network is connected, log error
-        if !reachabilityResult.isReachable {
-            errorMessage = reachabilityResult.error
+        networkMonitor.start()
+        reachabilityTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.isMonitoring, self.isConnected else { return }
+                await self.performCheck()
+            }
         }
+    }
 
-        // Only check additional endpoints if main reachability succeeded
-        if isReachable {
-            // Check Google reachability (lightweight HEAD request would be better but this works)
-            isGoogleReachable = await checkEndpointReachable(
-                urlString: "https://www.google.com/generate_204")
-
-            // Check Cloudflare reachability - using their DNS check endpoint
-            isCloudflareReachable = await checkEndpointReachable(
-                urlString: "https://cloudflare.com/cdn-cgi/trace")
-        } else {
-            isGoogleReachable = false
-            isCloudflareReachable = false
-        }
-
-        // Update signal quality based on latency
-        updateSignalQuality()
-
-        // Update state based on reachability
+    public func stopMonitoring() {
+        isMonitoring = false
+        networkMonitor.stop()
+        reachabilityTimer?.invalidate()
+        reachabilityTimer = nil
+        cancelCurrentCheck()
         updateState()
     }
 
-    /// Performs a background speed test without blocking UI
-    private func performBackgroundSpeedTest() async {
-        guard isReachable && !isPerformingSpeedTest else { return }
-        isPerformingSpeedTest = true
-        defer { isPerformingSpeedTest = false }
-
-        let speedTestResult = await speedTestService.measureSpeed(quick: true)
-        speedResult = speedTestResult
-
-        if let error = speedTestResult.error {
-            errorMessage = error
-        }
-
-        // Record the check
-        historyManager.recordCheck(
-            isConnected: isConnected,
-            connectionType: connectionType,
-            isReachable: isReachable,
-            speedMbps: speedResult?.speedMbps,
-            latencyMs: rttMs ?? responseTimeMs,  // Use RTT if available, otherwise response time
-            isVPNActive: isVPNActive,
-            errorMessage: errorMessage
-        )
-
-        // Trigger tip prompt after speed test (if appropriate)
-        if speedTestResult.error == nil {
-            tippingManager.recordSpeedTestCompleted()
-        }
-
-        // Update signal quality
-        updateSignalQuality()
+    private func cancelCurrentCheck() {
+        operationID = UUID()
+        checkTask?.cancel()
+        checkTask = nil
+        isPerformingCheck = false
+        isPerformingSpeedTest = false
     }
 
     // MARK: - Diagnostic Methods
@@ -365,7 +290,7 @@ public final class ConnectivityViewModel: ObservableObject {
     }
 
     /// Check if a specific endpoint is reachable
-    private func checkEndpointReachable(urlString: String) async -> Bool {
+    private static func checkEndpointReachable(urlString: String) async -> Bool {
         guard let url = URL(string: urlString) else { return false }
 
         let config = URLSessionConfiguration.ephemeral
@@ -377,7 +302,10 @@ public final class ConnectivityViewModel: ObservableObject {
         defer { session.invalidateAndCancel() }
 
         do {
-            let (_, response) = try await session.data(from: url)
+            var request = URLRequest(url: url)
+            request.httpMethod = "HEAD"
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            let (_, response) = try await session.data(for: request)
             if let httpResponse = response as? HTTPURLResponse {
                 return (200...399).contains(httpResponse.statusCode)
             }
@@ -387,212 +315,182 @@ public final class ConnectivityViewModel: ObservableObject {
         }
     }
 
-    /// Update signal quality based on latency and speed
-    /// Uses a more generous algorithm that reflects real-world usage
+    /// Describe measured connection quality without inventing scores for missing measurements.
     private func updateSignalQuality() {
         guard isReachable else {
             signalQuality = "No Signal"
             return
         }
-
-        // Calculate latency score (0-4 points) using true network RTT
-        // More generous thresholds - most connections have 20-100ms latency
-        let latencyScore: Int
-        if let rtt = rttMs {
+        var scores: [Int] = []
+        if let rtt = rttMs, rtt.isFinite, rtt >= 0 {
             switch rtt {
-            case 0..<20: latencyScore = 4  // Excellent
-            case 20..<50: latencyScore = 3  // Good
-            case 50..<100: latencyScore = 2  // Fair
-            case 100..<200: latencyScore = 1  // Acceptable
-            default: latencyScore = 0  // Poor
+            case 0..<20: scores.append(4)
+            case 20..<50: scores.append(3)
+            case 50..<100: scores.append(2)
+            case 100..<200: scores.append(1)
+            default: scores.append(0)
             }
-        } else {
-            latencyScore = 2  // Default to fair if no latency data
         }
-
-        // Calculate speed score (0-4 points)
-        // More realistic thresholds for modern connections
-        let speedScore: Int
-        if let speed = speedResult?.speedMbps {
-            switch speed {
-            case 50...: speedScore = 4  // Excellent
-            case 25..<50: speedScore = 3  // Good
-            case 10..<25: speedScore = 2  // Fair
-            case 5..<10: speedScore = 1  // Acceptable
-            default: speedScore = 0  // Poor
+        if let result = speedResult, result.error == nil,
+           result.speedMbps.isFinite, result.speedMbps >= 0 {
+            switch result.speedMbps {
+            case 50...: scores.append(4)
+            case 25..<50: scores.append(3)
+            case 10..<25: scores.append(2)
+            case 5..<10: scores.append(1)
+            default: scores.append(0)
             }
-        } else {
-            // If no speed test yet, base quality purely on latency
-            // Give benefit of doubt since speed test hasn't run
-            speedScore = 2
         }
-
-        // Weighted scoring: latency matters slightly more for perceived quality
-        // Max score: 8 points (4 from latency + 4 from speed)
-        let totalScore = latencyScore + speedScore
-
-        switch totalScore {
-        case 7...8: signalQuality = "Excellent"
-        case 5...6: signalQuality = "Good"
-        case 3...4: signalQuality = "Fair"
+        guard !scores.isEmpty else { signalQuality = "Unknown"; return }
+        let average = Double(scores.reduce(0, +)) / Double(scores.count)
+        switch average {
+        case 3.5...: signalQuality = "Excellent"
+        case 2.5..<3.5: signalQuality = "Good"
+        case 1.5..<2.5: signalQuality = "Fair"
         default: signalQuality = "Poor"
         }
     }
 
-    /// Performs a full connectivity check with optional speed test
+    /// Performs one serialized check. Results from an old network or stopped screen are discarded.
     public func performCheck(includeSpeedTest: Bool = false) async {
+        guard !isPreviewMode, !isPerformingCheck else { return }
+        guard isConnected else {
+            clearMeasurements()
+            updateState()
+            return
+        }
+        let id = UUID()
+        operationID = id
+        isPerformingCheck = true
         state = .checking
         errorMessage = nil
+        let task = Task<Void, Never> { [weak self] in
+            guard let self else { return }
+            await self.runCheck(id: id, includeSpeedTest: includeSpeedTest)
+        }
+        checkTask = task
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
 
-        // First, verify real reachability
-        let reachabilityResult = await reachabilityService.checkReachability()
-        isReachable = reachabilityResult.isReachable
-        latencyMs = reachabilityResult.latencyMs
+    private func runCheck(id: UUID, includeSpeedTest: Bool) async {
+        defer {
+            if operationID == id {
+                isPerformingCheck = false
+                isPerformingSpeedTest = false
+                checkTask = nil
+                updateState()
+            }
+        }
+        let reachability = await reachabilityCheck()
+        guard canApply(id) else { return }
+        isReachable = reachability.isReachable
+        responseTimeMs = reachability.isReachable ? reachability.responseTimeMs : nil
         lastCheckTime = Date()
+        errorMessage = reachability.error
+        rttMs = nil
+        latencyMs = nil
 
-        // Check additional endpoints
-        isGoogleReachable = await checkEndpointReachable(urlString: "https://www.google.com")
-        isCloudflareReachable = await checkEndpointReachable(urlString: "https://1.1.1.1")
-
-        if !reachabilityResult.isReachable {
-            if let error = reachabilityResult.error {
-                errorMessage = error
-            }
-        }
-
-        // Perform speed test if requested and we're reachable
-        if includeSpeedTest && isReachable {
-            state = .measuringSpeed
-            let speedTestResult = await speedTestService.measureSpeed(quick: false)
-            speedResult = speedTestResult
-
-            if let error = speedTestResult.error {
-                errorMessage = error
-            }
-        }
-
-        // Record the check
-        historyManager.recordCheck(
-            isConnected: isConnected,
-            connectionType: connectionType,
-            isReachable: isReachable,
-            speedMbps: speedResult?.speedMbps,
-            latencyMs: rttMs ?? responseTimeMs,  // Use real network RTT, fallback to response time
-            isVPNActive: isVPNActive,
-            errorMessage: errorMessage
-        )
-
-        // Update signal quality and state
-        updateSignalQuality()
-        updateState()
-
-        // Announce to VoiceOver
-        announceStatusChange()
-    }
-
-    /// Performs a quick check without speed test
-    public func quickCheck() async {
-        await performCheck(includeSpeedTest: false)
-    }
-
-    /// Performs a full check with speed test
-    public func fullCheck() async {
-        await performCheck(includeSpeedTest: true)
-    }
-
-    // MARK: - Private Methods
-
-    private func setupNetworkMonitorObservation() {
-        // Observe network monitor changes
-        Task { @MainActor in
-            // Initial sync
-            syncWithNetworkMonitor()
-
-            // Set up observation using Combine
-            networkMonitor.$isConnected
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] connected in
-                    guard let self = self else { return }
-                    let wasConnected = self.isConnected
-                    self.isConnected = connected
-
-                    // If connection state changed, update everything
-                    if wasConnected != connected {
-                        if connected {
-                            // Just connected - run immediate check
-                            Task {
-                                await self.performRealtimeCheck()
-                                await self.performBackgroundSpeedTest()
-                            }
-                        } else {
-                            // Just disconnected - clear stats
-                            self.isReachable = false
-                            self.isGoogleReachable = false
-                            self.isCloudflareReachable = false
-                            self.signalQuality = "No Signal"
-                            self.speedResult = nil
-                            self.latencyMs = nil
-                        }
-                    }
-                    self.updateState()
-                }
-                .store(in: &cancellables)
-
-            networkMonitor.$connectionType
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] type in
-                    self?.connectionType = type
-                    self?.updateState()
-                }
-                .store(in: &cancellables)
-
-            networkMonitor.$isVPNActive
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] vpnActive in
-                    self?.isVPNActive = vpnActive
-                }
-                .store(in: &cancellables)
-        }
-    }
-
-    private var cancellables = Set<AnyCancellable>()
-
-    private func syncWithNetworkMonitor() {
-        isConnected = networkMonitor.isConnected
-        connectionType = networkMonitor.connectionType
-        isVPNActive = networkMonitor.isVPNActive
-        updateState()
-
-        // Trigger immediate reachability check on network change
-        if isConnected {
-            Task {
-                await performRealtimeCheck()
-            }
+        if isReachable {
+            async let measuredLatency = latencyMeasurement()
+            async let google = endpointCheck("https://www.google.com/generate_204")
+            async let cloudflare = endpointCheck("https://cloudflare.com/cdn-cgi/trace")
+            let (latency, googleReachable, cloudflareReachable) = await (measuredLatency, google, cloudflare)
+            guard canApply(id) else { return }
+            rttMs = latency.rttMs
+            latencyMs = latency.rttMs ?? responseTimeMs
+            isGoogleReachable = googleReachable
+            isCloudflareReachable = cloudflareReachable
         } else {
-            // When disconnected, clear reachability status
-            isReachable = false
             isGoogleReachable = false
             isCloudflareReachable = false
-            signalQuality = "No Signal"
-            updateState()
+            speedResult = nil
         }
+
+        // Speed measurements consume data and never run on a timer or network transition.
+        var measuredSpeed: Double?
+        if includeSpeedTest, isReachable {
+            isPerformingSpeedTest = true
+            state = .measuringSpeed
+            let result = await speedMeasurement()
+            guard canApply(id) else { return }
+            speedResult = result
+            errorMessage = result.error
+            if result.error == nil {
+                measuredSpeed = result.speedMbps
+                tippingManager.recordSpeedTestCompleted()
+            }
+        }
+        guard canApply(id) else { return }
+        historyManager.recordCheck(
+            isConnected: isConnected, connectionType: connectionType, isReachable: isReachable,
+            speedMbps: measuredSpeed, rttMs: rttMs, responseTimeMs: responseTimeMs,
+            isVPNActive: isVPNActive, errorMessage: errorMessage
+        )
+        updateSignalQuality()
+        // Resolve the final state before VoiceOver announces it.
+        isPerformingCheck = false
+        isPerformingSpeedTest = false
+        updateState()
+        if includeSpeedTest { announceStatusChange() }
+    }
+
+    private func canApply(_ id: UUID) -> Bool {
+        !Task.isCancelled && operationID == id && isConnected && !isPreviewMode
+    }
+
+    public func quickCheck() async { await performCheck() }
+    public func fullCheck() async { await performCheck(includeSpeedTest: true) }
+
+    private func setupNetworkMonitorObservation() {
+        networkMonitor.$snapshot.compactMap { $0 }.sink { [weak self] snapshot in
+            self?.applyNetworkSnapshot(snapshot)
+        }.store(in: &cancellables)
+    }
+
+    // Kept internal so tests can simulate airplane-mode and interface changes deterministically.
+    func applyNetworkSnapshot(_ snapshot: NetworkPathSnapshot, automaticallyCheck: Bool = true) {
+        guard isMonitoring, !isPreviewMode else { return }
+        cancelCurrentCheck()
+        let wasConnected = isConnected
+        isConnected = snapshot.isConnected
+        connectionType = snapshot.connectionType
+        isVPNActive = snapshot.isVPNActive
+        isConstrained = snapshot.isConstrained
+        isExpensive = snapshot.isExpensive
+        clearMeasurements()
+        updateState()
+        if isConnected && automaticallyCheck {
+            checkTask = Task<Void, Never> { [weak self] in
+                guard let self else { return }
+                await self.performCheck()
+            }
+        } else if !isConnected && wasConnected {
+            historyManager.recordCheck(isConnected: false, connectionType: .none, isReachable: false)
+            lastCheckTime = Date()
+        }
+    }
+
+    private func clearMeasurements() {
+        isReachable = false
+        isGoogleReachable = false
+        isCloudflareReachable = false
+        rttMs = nil
+        responseTimeMs = nil
+        latencyMs = nil
+        speedResult = nil
+        errorMessage = nil
+        signalQuality = isConnected ? "Unknown" : "No Signal"
     }
 
     private func updateState() {
-        if state == .checking || state == .measuringSpeed {
-            return  // Don't interrupt active operations
-        }
-
-        if !isConnected {
-            state = .offline
-            signalQuality = "No Signal"
-        } else if isConnected && isReachable {
-            state = .online
-        } else if isConnected && !isReachable {
-            state = .limitedConnectivity
-        } else {
-            state = .offline
-        }
+        if !isConnected { state = .offline; signalQuality = "No Signal" }
+        else if isPerformingSpeedTest { state = .measuringSpeed }
+        else if isPerformingCheck { state = .checking }
+        else { state = isReachable ? .online : .limitedConnectivity }
     }
 
     private func announceStatusChange() {
@@ -679,13 +577,4 @@ public enum AppState: Equatable {
             return .red
         }
     }
-}
-
-// MARK: - Combine Import
-
-// MARK: - AnyCancellable
-
-@available(iOS 17.0, *)
-extension ConnectivityViewModel {
-    typealias AnyCancellable = Combine.AnyCancellable
 }

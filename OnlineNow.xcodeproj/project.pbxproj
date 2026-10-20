@@ -10,19 +10,29 @@
 		0455E57544559CA3CAB19722 /* DiagnosticService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 970AE6A9605A745B6098389D /* DiagnosticService.swift */; };
 		09A1EE6271B2BBB4AD723045 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364DAE63624E5C3D01D24825 /* NetworkMonitor.swift */; };
 		0A2EF3774B2A2BDC1C1A11E4 /* ConnectivityBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66743D154A795A73094D51AB /* ConnectivityBanner.swift */; };
+		166115F578ACC7B34A1DB27A /* Tests/OnlineNowTests/NetworkRetryRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 097AB8CF43DB43A56B795942 /* Tests/OnlineNowTests/NetworkRetryRegressionTests.swift */; };
 		188E4D35412B49720844C522 /* MockNetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B893A08A710CCFF6260809C /* MockNetworkMonitor.swift */; };
+		1D9BF5D4A1A0BDAC6C063B8E /* Tests/OnlineNowTests/NetworkServicesRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233EE8ECF5A0D2D5993AEFD0 /* Tests/OnlineNowTests/NetworkServicesRegressionTests.swift */; };
 		2D3A3E54D57DF192E04A2866 /* SupporterViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BA7F140A2FE89E5063C423 /* SupporterViews.swift */; };
 		4E0ECD38BD27623DDF6BB78C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7BF42FE4F30890F8479A8360 /* PrivacyInfo.xcprivacy */; };
+		520A432C1B64917D6BF55649 /* Tests/OnlineNowTests/OnlineNowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5BADD398D328F84C44B4FD6 /* Tests/OnlineNowTests/OnlineNowTests.swift */; };
 		5B638AE9D3892BD3B7E4F5B9 /* ConnectivityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1005405935CD4A8787B3B225 /* ConnectivityViewModel.swift */; };
 		624821973989B9BCCDE1EF09 /* LogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2A3A78DCBC93D9D202B4F0 /* LogoView.swift */; };
+		6ED23EF632D8E778A227FFA6 /* Tests/OnlineNowTests/TippingStoreKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7661D62EC990B102A546F493 /* Tests/OnlineNowTests/TippingStoreKitTests.swift */; };
 		701E7C5961302094B2B7C676 /* ConnectivityCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = D414BD2E2A8B2AF38633E7B3 /* ConnectivityCheck.swift */; };
 		70DEA087D03FDC7B6B7C5A92 /* TipJarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5932EFD8ABDBD412CDF17DF2 /* TipJarView.swift */; };
 		72DF3E3B79D29CD4F35E8920 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9BCC61696252B6B6890E0106 /* Assets.xcassets */; };
+		7439EA73F3C6B7A1E5F89094 /* Tests/OnlineNowTests/SpeedTestValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8CCB835587F2DAEB35E387 /* Tests/OnlineNowTests/SpeedTestValidationTests.swift */; };
 		7738A395DE441CC89E27F0D5 /* ConnectivityProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4005937A7CC133C81C836A0A /* ConnectivityProtocol.swift */; };
 		78A1E67B0F50AB249C0D37C4 /* ReachabilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88FF2F3FBDD470EAC346073C /* ReachabilityService.swift */; };
+		7AE5003625E755ACD5948011 /* Tests/OnlineNowTests/LifecycleHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF77CE0E065F46C8B17151B3 /* Tests/OnlineNowTests/LifecycleHistoryTests.swift */; };
 		7E9E9643174E05A9D9D95EEC /* StatDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE55FCE555450D7A5300DEF8 /* StatDetailView.swift */; };
+		846C2C149F8114EAC205184E /* Tests/OnlineNowUITests/OnlineNowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A0BA080449CF2BDE29B571 /* Tests/OnlineNowUITests/OnlineNowUITests.swift */; };
+		8DF9400119B55CEB19F82EEA /* Configuration.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 65F70A9E3C66731722C30E90 /* Configuration.storekit */; };
+		9702067C5240E6381EB246AA /* Tests/OnlineNowCoreTests/TipLedgerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D945EAC1AEC2581CAE10F7 /* Tests/OnlineNowCoreTests/TipLedgerTests.swift */; };
 		9DB97A5E5EBF3DCC3DB76193 /* SharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6925BC12715039D51D123A8F /* SharedTypes.swift */; };
 		9DDAAB58CE420C7D2860FE96 /* OnlineNow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5516F120678075B92C5D7613 /* OnlineNow.swift */; };
+		B746D43F43E65617784D78BA /* Tests/OnlineNowTests/TippingManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75D8648198E9FA36B0978EC /* Tests/OnlineNowTests/TippingManagerTests.swift */; };
 		B9B511A98337A838FED07E92 /* NetworkRetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0182E782E5F20C8EE0A82F4 /* NetworkRetry.swift */; };
 		C6FC8E261DFD9331D4B324FE /* HistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653D91E7640236AF6FD3F7EE /* HistoryListView.swift */; };
 		CE319F6FC9C7F3C26C10E81E /* SpeedTestService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55FD7ABF7A13146968713DB6 /* SpeedTestService.swift */; };
@@ -30,13 +40,36 @@
 		D71A643EC2E63101D3394D79 /* ConnectivityStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 791C46F53FEB01D7C2EC4945 /* ConnectivityStatusView.swift */; };
 		D7E454E24BEA30B44730CDF9 /* OnlineNowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5336AB661BAD4BCA9CE0827C /* OnlineNowApp.swift */; };
 		E21C19188F238E5AEB0919B1 /* LatencyMeasurementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C4FCECB9E079EE19C205B8 /* LatencyMeasurementService.swift */; };
+		E9CD6429900E5B93577096E5 /* Sources/OnlineNow/Services/TipLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25331DB1751D865C67F8DBA /* Sources/OnlineNow/Services/TipLedger.swift */; };
+		EBCE519FC38E3692489F26DD /* Tests/OnlineNowTests/BannerLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5DABD63D1CC122FF20FEC60 /* Tests/OnlineNowTests/BannerLifecycleTests.swift */; };
+		EEF7C41FC053B650B9FAB26E /* Configuration.storekit in Resources */ = {isa = PBXBuildFile; fileRef = E2A273BBF3DDB66ABAE99050 /* Configuration.storekit */; };
 		FFA55C1C47445517385732FE /* TippingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B883CE719A71B2D0C05FC0 /* TippingManager.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		0F3FBE2C12222EC15CB3E2AC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 36A805D0CBF45C356E07548E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F0170DDDF482329F9B489E04;
+			remoteInfo = OnlineNow;
+		};
+		C5DDEC0FB794593C6ED92DF8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 36A805D0CBF45C356E07548E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F0170DDDF482329F9B489E04;
+			remoteInfo = OnlineNow;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		097AB8CF43DB43A56B795942 /* Tests/OnlineNowTests/NetworkRetryRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowTests/NetworkRetryRegressionTests.swift; sourceTree = SOURCE_ROOT; };
 		1005405935CD4A8787B3B225 /* ConnectivityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityViewModel.swift; sourceTree = "<group>"; };
 		1A2A3A78DCBC93D9D202B4F0 /* LogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoView.swift; sourceTree = "<group>"; };
+		233EE8ECF5A0D2D5993AEFD0 /* Tests/OnlineNowTests/NetworkServicesRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowTests/NetworkServicesRegressionTests.swift; sourceTree = SOURCE_ROOT; };
 		364DAE63624E5C3D01D24825 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		37D945EAC1AEC2581CAE10F7 /* Tests/OnlineNowCoreTests/TipLedgerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowCoreTests/TipLedgerTests.swift; sourceTree = SOURCE_ROOT; };
 		4005937A7CC133C81C836A0A /* ConnectivityProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityProtocol.swift; sourceTree = "<group>"; };
 		425EBA620FE45AF3F470A4C1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5336AB661BAD4BCA9CE0827C /* OnlineNowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineNowApp.swift; sourceTree = "<group>"; };
@@ -44,10 +77,14 @@
 		55FD7ABF7A13146968713DB6 /* SpeedTestService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTestService.swift; sourceTree = "<group>"; };
 		5932EFD8ABDBD412CDF17DF2 /* TipJarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipJarView.swift; sourceTree = "<group>"; };
 		61055ABB3D0DF27FE036BD32 /* OnlineNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OnlineNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		64C50BBBB85068602EE7F067 /* OnlineNowUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OnlineNowUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		653D91E7640236AF6FD3F7EE /* HistoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryListView.swift; sourceTree = "<group>"; };
+		65F70A9E3C66731722C30E90 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = SOURCE_ROOT; };
 		66743D154A795A73094D51AB /* ConnectivityBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityBanner.swift; sourceTree = "<group>"; };
 		6925BC12715039D51D123A8F /* SharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTypes.swift; sourceTree = "<group>"; };
+		6C8CCB835587F2DAEB35E387 /* Tests/OnlineNowTests/SpeedTestValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowTests/SpeedTestValidationTests.swift; sourceTree = SOURCE_ROOT; };
 		74C4FCECB9E079EE19C205B8 /* LatencyMeasurementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatencyMeasurementService.swift; sourceTree = "<group>"; };
+		7661D62EC990B102A546F493 /* Tests/OnlineNowTests/TippingStoreKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowTests/TippingStoreKitTests.swift; sourceTree = SOURCE_ROOT; };
 		791C46F53FEB01D7C2EC4945 /* ConnectivityStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityStatusView.swift; sourceTree = "<group>"; };
 		7BF42FE4F30890F8479A8360 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		88FF2F3FBDD470EAC346073C /* ReachabilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReachabilityService.swift; sourceTree = "<group>"; };
@@ -55,18 +92,45 @@
 		970AE6A9605A745B6098389D /* DiagnosticService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticService.swift; sourceTree = "<group>"; };
 		9B893A08A710CCFF6260809C /* MockNetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockNetworkMonitor.swift; sourceTree = "<group>"; };
 		9BCC61696252B6B6890E0106 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AED90AE66E1294D7FC8BDCCF /* OnlineNowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OnlineNowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B25331DB1751D865C67F8DBA /* Sources/OnlineNow/Services/TipLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/OnlineNow/Services/TipLedger.swift; sourceTree = SOURCE_ROOT; };
 		B3B883CE719A71B2D0C05FC0 /* TippingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TippingManager.swift; sourceTree = "<group>"; };
+		B5BADD398D328F84C44B4FD6 /* Tests/OnlineNowTests/OnlineNowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowTests/OnlineNowTests.swift; sourceTree = SOURCE_ROOT; };
+		B5DABD63D1CC122FF20FEC60 /* Tests/OnlineNowTests/BannerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowTests/BannerLifecycleTests.swift; sourceTree = SOURCE_ROOT; };
 		C4E3B05A01206646C3EC4B99 /* HistoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryManager.swift; sourceTree = "<group>"; };
 		CE55FCE555450D7A5300DEF8 /* StatDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatDetailView.swift; sourceTree = "<group>"; };
 		D0182E782E5F20C8EE0A82F4 /* NetworkRetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkRetry.swift; sourceTree = "<group>"; };
 		D414BD2E2A8B2AF38633E7B3 /* ConnectivityCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityCheck.swift; sourceTree = "<group>"; };
+		D5A0BA080449CF2BDE29B571 /* Tests/OnlineNowUITests/OnlineNowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowUITests/OnlineNowUITests.swift; sourceTree = SOURCE_ROOT; };
+		E2A273BBF3DDB66ABAE99050 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = SOURCE_ROOT; };
+		E75D8648198E9FA36B0978EC /* Tests/OnlineNowTests/TippingManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowTests/TippingManagerTests.swift; sourceTree = SOURCE_ROOT; };
+		EF77CE0E065F46C8B17151B3 /* Tests/OnlineNowTests/LifecycleHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OnlineNowTests/LifecycleHistoryTests.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		23E62728FE7DE5547E6FA833 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EBF90469D6DE8CFB69DBBD88 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		0C0EEE24D8FFAD35E1FF3770 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				61055ABB3D0DF27FE036BD32 /* OnlineNow.app */,
+				AED90AE66E1294D7FC8BDCCF /* OnlineNowTests.xctest */,
+				64C50BBBB85068602EE7F067 /* OnlineNowUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -86,6 +150,9 @@
 				6211251774AAE235E1F481CA /* App */,
 				D24D43AC250B0E9EA5F20BE7 /* OnlineNow */,
 				0C0EEE24D8FFAD35E1FF3770 /* Products */,
+				B25331DB1751D865C67F8DBA /* Sources/OnlineNow/Services/TipLedger.swift */,
+				9CED555C4F5489BEF68D49DF /* OnlineNowTests */,
+				B9F1CB3B48D05B45BE45ED8F /* OnlineNowUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -121,12 +188,38 @@
 			path = Testing;
 			sourceTree = "<group>";
 		};
+		9CED555C4F5489BEF68D49DF /* OnlineNowTests */ = {
+			isa = PBXGroup;
+			children = (
+				B5DABD63D1CC122FF20FEC60 /* Tests/OnlineNowTests/BannerLifecycleTests.swift */,
+				EF77CE0E065F46C8B17151B3 /* Tests/OnlineNowTests/LifecycleHistoryTests.swift */,
+				097AB8CF43DB43A56B795942 /* Tests/OnlineNowTests/NetworkRetryRegressionTests.swift */,
+				233EE8ECF5A0D2D5993AEFD0 /* Tests/OnlineNowTests/NetworkServicesRegressionTests.swift */,
+				B5BADD398D328F84C44B4FD6 /* Tests/OnlineNowTests/OnlineNowTests.swift */,
+				6C8CCB835587F2DAEB35E387 /* Tests/OnlineNowTests/SpeedTestValidationTests.swift */,
+				E75D8648198E9FA36B0978EC /* Tests/OnlineNowTests/TippingManagerTests.swift */,
+				7661D62EC990B102A546F493 /* Tests/OnlineNowTests/TippingStoreKitTests.swift */,
+				37D945EAC1AEC2581CAE10F7 /* Tests/OnlineNowCoreTests/TipLedgerTests.swift */,
+				E2A273BBF3DDB66ABAE99050 /* Configuration.storekit */,
+			);
+			name = OnlineNowTests;
+			sourceTree = "<group>";
+		};
 		A0CCE1D436BA392DB0B4C8D6 /* Protocols */ = {
 			isa = PBXGroup;
 			children = (
 				4005937A7CC133C81C836A0A /* ConnectivityProtocol.swift */,
 			);
 			path = Protocols;
+			sourceTree = "<group>";
+		};
+		B9F1CB3B48D05B45BE45ED8F /* OnlineNowUITests */ = {
+			isa = PBXGroup;
+			children = (
+				D5A0BA080449CF2BDE29B571 /* Tests/OnlineNowUITests/OnlineNowUITests.swift */,
+				65F70A9E3C66731722C30E90 /* Configuration.storekit */,
+			);
+			name = OnlineNowUITests;
 			sourceTree = "<group>";
 		};
 		C84DB4D818F6E3FC2052FFE7 /* ViewModels */ = {
@@ -171,6 +264,42 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		5D927C76A857608E398F9670 /* OnlineNowUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5F1D7F6426C8397A5D9FB456 /* Build configuration list for PBXNativeTarget "OnlineNowUITests" */;
+			buildPhases = (
+				FD39566D40A80C58C5D4FE87 /* Sources */,
+				23E62728FE7DE5547E6FA833 /* Frameworks */,
+				282A685F98D4585031DEE105 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				640CA5063C5E8CD884C81EAD /* PBXTargetDependency */,
+			);
+			name = OnlineNowUITests;
+			productName = OnlineNowUITests;
+			productReference = 64C50BBBB85068602EE7F067 /* OnlineNowUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		C4A30E17AE9AFF4CDC8B0633 /* OnlineNowTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E9E88206FCD84C089BCB0F53 /* Build configuration list for PBXNativeTarget "OnlineNowTests" */;
+			buildPhases = (
+				B01DFEAF7EAA0C3F069738DA /* Sources */,
+				EBF90469D6DE8CFB69DBBD88 /* Frameworks */,
+				5B554A70660F37596D578EF5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7CC421EE0320D59EEF142A92 /* PBXTargetDependency */,
+			);
+			name = OnlineNowTests;
+			productName = OnlineNowTests;
+			productReference = AED90AE66E1294D7FC8BDCCF /* OnlineNowTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		F0170DDDF482329F9B489E04 /* OnlineNow */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 562031AD23A90F31B0D0EE4A /* Build configuration list for PBXNativeTarget "OnlineNow" */;
@@ -198,6 +327,14 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
+					5D927C76A857608E398F9670 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = F0170DDDF482329F9B489E04;
+					};
+					C4A30E17AE9AFF4CDC8B0633 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = F0170DDDF482329F9B489E04;
+					};
 					F0170DDDF482329F9B489E04 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -217,11 +354,29 @@
 			projectRoot = "";
 			targets = (
 				F0170DDDF482329F9B489E04 /* OnlineNow */,
+				C4A30E17AE9AFF4CDC8B0633 /* OnlineNowTests */,
+				5D927C76A857608E398F9670 /* OnlineNowUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		282A685F98D4585031DEE105 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8DF9400119B55CEB19F82EEA /* Configuration.storekit in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B554A70660F37596D578EF5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EEF7C41FC053B650B9FAB26E /* Configuration.storekit in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		89D86A020D171B546AF479FC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -260,10 +415,48 @@
 				2D3A3E54D57DF192E04A2866 /* SupporterViews.swift in Sources */,
 				70DEA087D03FDC7B6B7C5A92 /* TipJarView.swift in Sources */,
 				FFA55C1C47445517385732FE /* TippingManager.swift in Sources */,
+				E9CD6429900E5B93577096E5 /* Sources/OnlineNow/Services/TipLedger.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B01DFEAF7EAA0C3F069738DA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EBCE519FC38E3692489F26DD /* Tests/OnlineNowTests/BannerLifecycleTests.swift in Sources */,
+				7AE5003625E755ACD5948011 /* Tests/OnlineNowTests/LifecycleHistoryTests.swift in Sources */,
+				166115F578ACC7B34A1DB27A /* Tests/OnlineNowTests/NetworkRetryRegressionTests.swift in Sources */,
+				1D9BF5D4A1A0BDAC6C063B8E /* Tests/OnlineNowTests/NetworkServicesRegressionTests.swift in Sources */,
+				520A432C1B64917D6BF55649 /* Tests/OnlineNowTests/OnlineNowTests.swift in Sources */,
+				7439EA73F3C6B7A1E5F89094 /* Tests/OnlineNowTests/SpeedTestValidationTests.swift in Sources */,
+				B746D43F43E65617784D78BA /* Tests/OnlineNowTests/TippingManagerTests.swift in Sources */,
+				6ED23EF632D8E778A227FFA6 /* Tests/OnlineNowTests/TippingStoreKitTests.swift in Sources */,
+				9702067C5240E6381EB246AA /* Tests/OnlineNowCoreTests/TipLedgerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FD39566D40A80C58C5D4FE87 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				846C2C149F8114EAC205184E /* Tests/OnlineNowUITests/OnlineNowUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		640CA5063C5E8CD884C81EAD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F0170DDDF482329F9B489E04 /* OnlineNow */;
+			targetProxy = 0F3FBE2C12222EC15CB3E2AC /* PBXContainerItemProxy */;
+		};
+		7CC421EE0320D59EEF142A92 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F0170DDDF482329F9B489E04 /* OnlineNow */;
+			targetProxy = C5DDEC0FB794593C6ED92DF8 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		02B6029B0680A391C6DA023E /* Debug */ = {
@@ -329,6 +522,55 @@
 			};
 			name = Debug;
 		};
+		0C0D084ED2DB089A204C0177 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MV634X2D7X;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gdemay.onlinenow.OnlineNowUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = OnlineNow;
+			};
+			name = Debug;
+		};
+		3A70A5D23AD3943EBF6804AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MV634X2D7X;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gdemay.onlinenow.OnlineNowTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OnlineNow.app/OnlineNow";
+			};
+			name = Release;
+		};
+		9EECE0335227413C41D543C0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MV634X2D7X;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gdemay.onlinenow.OnlineNowUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = OnlineNow;
+			};
+			name = Release;
+		};
 		A3810B6595109B38D7DCB3CC /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -385,6 +627,23 @@
 			};
 			name = Release;
 		};
+		A4A5E584E2164784A3B967C0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MV634X2D7X;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gdemay.onlinenow.OnlineNowTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OnlineNow.app/OnlineNow";
+			};
+			name = Debug;
+		};
 		EFB474EFAD7B4B00B3483EE8 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -394,7 +653,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = GB87Z9SKC5;
 				ENABLE_BITCODE = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -406,14 +665,14 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gdemay.onlinenow;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
-				SWIFT_VERSION = 5.9;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -428,7 +687,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = GB87Z9SKC5;
 				ENABLE_BITCODE = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -440,14 +699,14 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gdemay.onlinenow;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
-				SWIFT_VERSION = 5.9;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -465,6 +724,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		5F1D7F6426C8397A5D9FB456 /* Build configuration list for PBXNativeTarget "OnlineNowUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C0D084ED2DB089A204C0177 /* Debug */,
+				9EECE0335227413C41D543C0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		C69D4CCC13FECF2F26740C29 /* Build configuration list for PBXProject "OnlineNow" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -473,6 +741,15 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
+		};
+		E9E88206FCD84C089BCB0F53 /* Build configuration list for PBXNativeTarget "OnlineNowTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A4A5E584E2164784A3B967C0 /* Debug */,
+				3A70A5D23AD3943EBF6804AA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

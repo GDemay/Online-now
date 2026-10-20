@@ -1,35 +1,31 @@
 {
-  "identifier" : "2B1F4C8D",
-  "nonRenewingSubscriptions" : [
-
-  ],
-  "products" : [
+  "identifier": "2B1F4C8D",
+  "nonRenewingSubscriptions": [],
+  "products": [
     {
-      "displayPrice" : "0.99",
-      "familyShareable" : false,
-      "internalID" : "6759104017",
-      "localizations" : [
+      "displayPrice": "0.99",
+      "familyShareable": false,
+      "internalID": "6759104017",
+      "localizations": [
         {
-          "description" : "Support OnlineNow development with a donation.",
-          "displayName" : "Donation",
-          "locale" : "en_US"
+          "description": "An optional, one-time tip to support maintenance. All features remain free.",
+          "displayName": "Support Online Now",
+          "locale": "en_US"
         }
       ],
-      "productID" : "onlinenow.gdemay",
-      "referenceName" : "donation",
-      "type" : "Consumable"
+      "productID": "onlinenow.gdemay",
+      "referenceName": "donation",
+      "type": "Consumable"
     }
   ],
-  "settings" : {
-    "_applicationInternalID" : "6738429500",
-    "_developerTeamID" : "MV634X2D7X",
-    "_lastSynchronizedDate" : 761097600.0
+  "settings": {
+    "_applicationInternalID": "6738429500",
+    "_developerTeamID": "MV634X2D7X",
+    "_lastSynchronizedDate": 761097600.0
   },
-  "subscriptionGroups" : [
-
-  ],
-  "version" : {
-    "major" : 3,
-    "minor" : 0
+  "subscriptionGroups": [],
+  "version": {
+    "major": 3,
+    "minor": 0
   }
 }

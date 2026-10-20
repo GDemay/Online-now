@@ -1,154 +1,96 @@
 import Foundation
 
-/// Service to measure download speed accurately
-/// Uses streaming download with larger files for reliable measurements
+/// Measures end-to-end HTTPS download throughput. Connection setup is included;
+/// this is a useful estimate for this server, not a guaranteed ISP line rate.
 @available(iOS 15.0, macOS 12.0, watchOS 8.0, *)
 public actor SpeedTestService {
-
-    /// Test file sizes for different test modes
-    /// Quick test: 5MB, Full test: 10MB - needed for accurate high-speed measurements
-    private let quickTestBytes = 5_000_000  // 5MB
-    private let fullTestBytes = 10_000_000  // 10MB
-
-    /// Minimum test duration for reliable measurement (seconds)
-    private let minimumTestDuration: TimeInterval = 1.0
-
-    /// Maximum test duration before we have enough data (seconds)
-    private let maximumTestDuration: TimeInterval = 10.0
-
-    /// Timeout for speed tests (seconds)
     private let timeout: TimeInterval = 15
 
     public init() {}
 
-    /// Performs a speed test and returns the result
-    /// Uses download with progress tracking to measure actual throughput accurately
-    /// - Parameter quick: If true, uses smaller test file
-    /// - Returns: SpeedTestResult with speed in Mbps
+    /// Downloads up to 5 MB (quick) or 10 MB (full), only when requested by the user.
+    /// The response is written to disk so the entire test file is not held in memory.
     public func measureSpeed(quick: Bool = false) async -> SpeedTestResult {
-        let testBytes = quick ? quickTestBytes : fullTestBytes
-        let testURL = URL(string: "https://speed.cloudflare.com/__down?bytes=\(testBytes)")!
-
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = timeout
-        config.timeoutIntervalForResource = timeout
-        config.waitsForConnectivity = false
-        // Disable caching to ensure fresh download
-        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        config.urlCache = nil
-
-        let session = URLSession(configuration: config)
+        guard !Task.isCancelled else { return failure("Speed test cancelled") }
+        let expectedBytes = quick ? 5_000_000 : 10_000_000
+        let url = URL(string: "https://speed.cloudflare.com/__down?bytes=\(expectedBytes)")!
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = timeout
+        configuration.timeoutIntervalForResource = timeout
+        configuration.waitsForConnectivity = false
+        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        configuration.urlCache = nil
+        let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }
 
+        var request = URLRequest(url: url)
+        // Compression would measure compressed wire bytes against decoded file size.
+        request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+        let start = ProcessInfo.processInfo.systemUptime
         do {
-            let overallStartTime = Date()
-            let (data, response) = try await session.data(from: testURL)
-
-            guard let httpResponse = response as? HTTPURLResponse,
-                (200...299).contains(httpResponse.statusCode)
-            else {
-                return SpeedTestResult(
-                    speedMbps: nil,
-                    bytesDownloaded: 0,
-                    durationSeconds: 0,
-                    error: "Invalid response from speed test server"
-                )
-            }
-
-            let overallElapsed = Date().timeIntervalSince(overallStartTime)
-            let totalBytes = data.count
-
-            // Apply warmup adjustment: exclude first 100KB from speed calculation
-            // This accounts for TCP slow start and connection establishment overhead
-            let warmupThreshold = 100_000  // 100KB
-            let measuredBytes: Int
-            let measuredDuration: Double
-
-            if totalBytes > warmupThreshold && overallElapsed > 0.5 {
-                // Estimate warmup time proportionally (conservative estimate)
-                // Typically first 100KB takes disproportionately longer
-                let warmupRatio = Double(warmupThreshold) / Double(totalBytes)
-                let estimatedWarmupTime = overallElapsed * warmupRatio * 2.0  // 2x factor for slow start
-
-                measuredBytes = totalBytes - warmupThreshold
-                measuredDuration = max(overallElapsed - estimatedWarmupTime, overallElapsed * 0.8)
-            } else {
-                // Download was too small or too fast - use overall measurement
-                measuredBytes = totalBytes
-                measuredDuration = overallElapsed
-            }
-            // Calculate speed in Mbps: (bits / duration) / 1,000,000
-            let bitsDownloaded = Double(measuredBytes) * 8
-            let speedMbps = bitsDownloaded / measuredDuration / 1_000_000
-            return SpeedTestResult(
-                speedMbps: speedMbps,
-                bytesDownloaded: totalBytes,
-                durationSeconds: overallElapsed,
-                error: nil
-            )
-
-        } catch let error as URLError {
-            let errorMessage: String
-
-            switch error.code {
-            case .timedOut:
-                errorMessage = "Speed test timed out - connection may be very slow"
-            case .notConnectedToInternet:
-                errorMessage = "No internet connection"
-            case .networkConnectionLost:
-                errorMessage = "Connection lost during test"
-            default:
-                errorMessage = "Speed test failed: \(error.localizedDescription)"
-            }
-
-            return SpeedTestResult(
-                speedMbps: nil,
-                bytesDownloaded: 0,
-                durationSeconds: 0,
-                error: errorMessage
-            )
-
+            let (fileURL, response) = try await session.download(for: request)
+            defer { try? FileManager.default.removeItem(at: fileURL) }
+            guard !Task.isCancelled else { return failure("Speed test cancelled") }
+            let elapsed = ProcessInfo.processInfo.systemUptime - start
+            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+            let bytes = (attributes[.size] as? NSNumber)?.intValue ?? 0
+            return Self.result(bytes: bytes, duration: elapsed, expectedBytes: expectedBytes,
+                               response: response)
         } catch {
-            return SpeedTestResult(
-                speedMbps: nil,
-                bytesDownloaded: 0,
-                durationSeconds: 0,
-                error: "Speed test failed: \(error.localizedDescription)"
-            )
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled {
+                return failure("Speed test cancelled")
+            }
+            let message: String
+            switch (error as? URLError)?.code {
+            case .timedOut: message = "Speed test timed out. Try again on a faster connection."
+            case .notConnectedToInternet: message = "No internet connection"
+            case .networkConnectionLost: message = "Connection lost during test"
+            default: message = "Speed test failed: \(error.localizedDescription)"
+            }
+            return failure(message)
         }
     }
 
-    /// Returns a human-readable description of the speed
+    /// Validate the actual transfer before calculating a result. A portal/error page,
+    /// compressed response, or incomplete file must never become a successful test.
+    static func result(bytes: Int, duration: Double, expectedBytes: Int,
+                       response: URLResponse) -> SpeedTestResult {
+        let http = response as? HTTPURLResponse
+        let encoding = http?.value(forHTTPHeaderField: "Content-Encoding")?.lowercased()
+        guard http?.statusCode == 200,
+              response.url?.host == "speed.cloudflare.com",
+              response.mimeType?.lowercased() != "text/html",
+              encoding == nil || encoding == "identity",
+              expectedBytes > 0, bytes == expectedBytes,
+              duration.isFinite, duration > 0 else {
+            return SpeedTestResult(speedMbps: nil, bytesDownloaded: max(0, bytes),
+                                   durationSeconds: max(0, duration.isFinite ? duration : 0),
+                                   error: "The speed test server returned an incomplete or unexpected response.")
+        }
+        return SpeedTestResult(speedMbps: Double(bytes) * 8 / duration / 1_000_000,
+                               bytesDownloaded: bytes, durationSeconds: duration, error: nil)
+    }
+
+    private func failure(_ message: String) -> SpeedTestResult {
+        SpeedTestResult(speedMbps: nil, bytesDownloaded: 0, durationSeconds: 0, error: message)
+    }
+
     public static func speedDescription(_ speedMbps: Double) -> String {
+        guard speedMbps.isFinite, speedMbps >= 0 else { return "Unknown" }
         switch speedMbps {
-        case 0..<1:
-            return "Very Slow"
-        case 1..<5:
-            return "Slow"
-        case 5..<25:
-            return "Moderate"
-        case 25..<100:
-            return "Fast"
-        case 100...:
-            return "Very Fast"
-        default:
-            return "Unknown"
+        case ..<1: return "Very Slow"
+        case ..<5: return "Slow"
+        case ..<25: return "Moderate"
+        case ..<100: return "Fast"
+        default: return "Very Fast"
         }
     }
 
-    /// Returns a confidence message based on speed test conditions
     public static func confidenceMessage(_ result: SpeedTestResult) -> String {
-        guard result.speedMbps != nil else {
-            return "Unable to measure speed"
-        }
-
-        if result.durationSeconds < 0.5 {
-            return "Quick test - actual speed may vary"
-        } else if result.durationSeconds > 10 {
-            return "Slow connection detected"
-        } else {
-            return "Reliable measurement"
-        }
+        guard let speed = result.speedMbps, speed.isFinite, speed >= 0,
+              result.error == nil else { return "Unable to measure speed" }
+        if result.durationSeconds < 0.5 { return "Short sample — actual speed may vary" }
+        return "HTTPS download estimate — speeds vary by server and network"
     }
 }
 
@@ -168,7 +110,7 @@ public struct SpeedTestResult: Sendable {
 
     /// Formatted speed string
     public var formattedSpeed: String {
-        guard let speed = speedMbps else { return "—" }
+        guard let speed = speedMbps, speed.isFinite, speed >= 0 else { return "—" }
         if speed < 1 {
             return String(format: "%.2f Mbps", speed)
         } else if speed < 10 {
