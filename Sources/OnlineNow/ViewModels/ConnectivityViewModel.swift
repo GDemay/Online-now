@@ -132,7 +132,7 @@ public final class ConnectivityViewModel: ObservableObject {
     /// Latest speed test result
     @Published public private(set) var speedResult: SpeedTestResult?
 
-    /// True network latency (RTT) from TCP measurement
+    /// TCP connection setup estimate in milliseconds; includes local scheduling overhead.
     @Published public private(set) var rttMs: Double?
 
     /// HTTP response time (includes DNS, TCP, TLS, server processing)
@@ -214,7 +214,7 @@ public final class ConnectivityViewModel: ObservableObject {
         historyManager.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
-        tippingManager.objectWillChange.sink { [weak self] _ in
+        self.tippingManager.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
     }
@@ -331,9 +331,9 @@ public final class ConnectivityViewModel: ObservableObject {
             default: scores.append(0)
             }
         }
-        if let result = speedResult, result.error == nil,
-           result.speedMbps.isFinite, result.speedMbps >= 0 {
-            switch result.speedMbps {
+        if let result = speedResult, result.error == nil, let speed = result.speedMbps,
+           speed.isFinite, speed >= 0 {
+            switch speed {
             case 50...: scores.append(4)
             case 25..<50: scores.append(3)
             case 10..<25: scores.append(2)
@@ -419,8 +419,8 @@ public final class ConnectivityViewModel: ObservableObject {
             guard canApply(id) else { return }
             speedResult = result
             errorMessage = result.error
-            if result.error == nil {
-                measuredSpeed = result.speedMbps
+            if result.error == nil, let speed = result.speedMbps, speed.isFinite, speed >= 0 {
+                measuredSpeed = speed
                 tippingManager.recordSpeedTestCompleted()
             }
         }
@@ -498,7 +498,8 @@ public final class ConnectivityViewModel: ObservableObject {
         switch state {
         case .online:
             announcement = "Connected to internet via \(connectionType.displayName)"
-            if let speed = speedResult?.speedMbps {
+            if let result = speedResult, result.error == nil, let speed = result.speedMbps,
+               speed.isFinite, speed >= 0 {
                 let speedDesc = SpeedTestService.speedDescription(speed)
                 announcement += ". Speed: \(speedDesc)"
             }

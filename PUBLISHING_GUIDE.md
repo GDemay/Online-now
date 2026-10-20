@@ -1,3 +1,5 @@
+> Historical first-publication guide. Current candidate and remaining verification: [AUDIT.md](AUDIT.md). Do not treat the old examples below as current App Store configuration.
+
 # 🚀 First-Time App Store Publishing Guide
 
 This guide walks you through every step to publish Online Now on the Apple App Store for the first time.

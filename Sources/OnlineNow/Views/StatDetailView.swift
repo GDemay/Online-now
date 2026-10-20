@@ -6,7 +6,7 @@ import Charts
 @available(iOS 17.0, macOS 14.0, *)
 public enum StatType: String, CaseIterable, Identifiable {
     case speed = "Speed"
-    case latency = "TCP Latency"
+    case latency = "TCP Setup Estimate"
     case quality = "Quality"
     case connectionType = "Connection"
 
@@ -35,7 +35,7 @@ public enum StatType: String, CaseIterable, Identifiable {
         case .speed:
             return "Download speed measures how fast data can be downloaded to your device. Higher speeds mean faster loading times for websites, videos, and apps."
         case .latency:
-            return "TCP latency estimates connection responsiveness by timing a TCP connection to a public server. It includes connection setup and device scheduling, and is different from an ICMP ping. Lower values usually mean a more responsive connection."
+            return "The TCP setup estimate times a connection to a public server. It includes connection setup and device scheduling, and is different from an ICMP ping. Lower values usually mean a more responsive connection."
         case .quality:
             return "Connection quality estimates performance from TCP latency and, when you run a speed test, download speed. It does not measure Wi-Fi or cellular radio signal strength."
         case .connectionType:
@@ -157,7 +157,7 @@ public struct StatDetailView: View {
                 }
             }
 
-            Text("Current \(statType.rawValue)")
+            Text(statType == .speed ? "Last Measured Download Speed" : "Current \(statType.rawValue)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -323,7 +323,7 @@ public struct StatDetailView: View {
                 "WiFi is usually faster than cellular",
                 "5G cellular can match WiFi speeds",
                 "Switch to cellular if WiFi is unstable",
-                "Airplane mode disables all connections"
+                "Wi-Fi can be re-enabled while Airplane Mode is on"
             ]
         }
     }
@@ -333,12 +333,12 @@ public struct StatDetailView: View {
 
         switch statType {
         case .speed:
-            return checks.compactMap { check in
+            return checks.compactMap { check -> ChartDataPoint? in
                 guard let speed = check.speedMbps, speed.isFinite, speed >= 0 else { return nil }
                 return ChartDataPoint(id: check.id, timestamp: check.timestamp, value: speed)
             }.sorted { $0.timestamp < $1.timestamp }
         case .latency:
-            return checks.compactMap { check in
+            return checks.compactMap { check -> ChartDataPoint? in
                 guard let latency = check.rttMs, latency.isFinite, latency >= 0 else { return nil }
                 return ChartDataPoint(id: check.id, timestamp: check.timestamp, value: latency)
             }.sorted { $0.timestamp < $1.timestamp }

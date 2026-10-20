@@ -28,9 +28,10 @@ final class OnlineNowUITests: XCTestCase {
 
     func testDonationPurchaseAndRepeatedTip() throws {
         let store = try SKTestSession(configurationFileNamed: "Configuration")
+        store.resetToDefaultState()
         store.disableDialogs = true
         store.clearTransactions()
-        defer { store.clearTransactions() }
+        defer { store.clearTransactions(); store.resetToDefaultState() }
         app.launch()
         app.buttons["navigation.tipJar"].tap()
         let purchase = app.buttons["tipJar.purchase"]

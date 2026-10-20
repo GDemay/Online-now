@@ -33,7 +33,7 @@ final class BannerLifecycleTests: XCTestCase {
     }
 
     func testNonfiniteLatencyAndLocalOnlyState() {
-        let model = ConnectivityBannerViewModel(configuration: .problemsOnlyForTesting)
+        let model = ConnectivityBannerViewModel(configuration: .init(displayMode: .problemsOnly, hapticFeedback: false))
         model.updateStatus(.connected, latency: .infinity)
         XCTAssertNil(model.metadata.latencyMs)
         model.updateStatus(.localOnly, latency: 0)
@@ -42,8 +42,3 @@ final class BannerLifecycleTests: XCTestCase {
     }
 }
 
-private extension ConnectivityBannerConfiguration {
-    static var problemsOnlyForTesting: Self {
-        .init(displayMode: .problemsOnly, hapticFeedback: false)
-    }
-}

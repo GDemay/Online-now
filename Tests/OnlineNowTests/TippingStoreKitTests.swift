@@ -12,9 +12,10 @@ import XCTest
 final class TippingStoreKitTests: XCTestCase {
     func testRepeatConsumablePurchaseAndUnfinishedRecovery() async throws {
         let session = try SKTestSession(configurationFileNamed: "Configuration")
+        session.resetToDefaultState()
         session.disableDialogs = true
         session.clearTransactions()
-        defer { session.clearTransactions() }
+        defer { session.clearTransactions(); session.resetToDefaultState() }
 
         let suite = "OnlineNow.StoreKitTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
@@ -44,10 +45,11 @@ final class TippingStoreKitTests: XCTestCase {
 
     func testAskToBuyApprovalIsDeliveredOnce() async throws {
         let session = try SKTestSession(configurationFileNamed: "Configuration")
+        session.resetToDefaultState()
         session.disableDialogs = true
         session.askToBuyEnabled = true
         session.clearTransactions()
-        defer { session.clearTransactions() }
+        defer { session.clearTransactions(); session.resetToDefaultState() }
 
         let suite = "OnlineNow.AskToBuyTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

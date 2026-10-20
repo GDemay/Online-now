@@ -14,7 +14,6 @@ public struct ConnectivityStatusView: View {
     @State private var showTipJar = false
     @State private var selectedStatType: StatType?
     @State private var actionTask: Task<Void, Never>?
-    @Namespace private var animation
 
     public init() {}
 
@@ -192,9 +191,10 @@ public struct ConnectivityStatusView: View {
 
     private var measurementActions: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) { refreshButton; speedTestButton }
+            if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 12) { refreshButton; speedTestButton }
+            } else {
+                HStack(spacing: 12) { refreshButton; speedTestButton }
             }
             Text("Speed tests download data and use your current Wi-Fi or mobile plan. They run only when you choose Test Speed.")
                 .font(.footnote)
@@ -248,7 +248,7 @@ public struct ConnectivityStatusView: View {
             }
             return "—"
         case .latency:
-            // Use real network RTT (TCP latency), not HTTP response time
+            // TCP setup timing is kept separate from full HTTP response time.
             if let rtt = viewModel.rttMs {
                 return String(format: "%.0f", rtt)
             }
@@ -365,7 +365,7 @@ public struct ConnectivityStatusView: View {
         case .online:
             var subtitle = "Connected via \(viewModel.connectionType.displayName)"
             if viewModel.isVPNActive {
-                subtitle += " • VPN Active"
+                subtitle += " • Possible VPN"
             }
             if let lastCheck = viewModel.lastCheckTime {
                 let formatter = RelativeDateTimeFormatter()
@@ -403,7 +403,7 @@ public struct ConnectivityStatusView: View {
                 Button { selectedStatType = .speed } label: {
                 // Speed card - tappable
                 MiniStatCard(
-                    title: "Speed",
+                    title: "Last Download Speed",
                     value: currentValueFor(.speed),
                     unit: viewModel.speedResult?.speedMbps != nil ? "Mbps" : "",
                     icon: "arrow.down.circle.fill",
@@ -416,9 +416,9 @@ public struct ConnectivityStatusView: View {
                 .accessibilityLabel("Download speed, \(currentValueFor(.speed)) megabits per second")
                 .accessibilityHint("View speed details and history")
 
-                // Latency card - tappable (shows real network RTT)
+                // TCP setup timing includes connection setup and local scheduling.
                 Button { selectedStatType = .latency } label: { MiniStatCard(
-                    title: "TCP Latency",
+                    title: "TCP Setup Estimate",
                     value: currentValueFor(.latency),
                     unit: viewModel.rttMs != nil ? "ms" : "",
                     icon: "timer",
@@ -427,7 +427,7 @@ public struct ConnectivityStatusView: View {
                 )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("TCP connection time, \(currentValueFor(.latency)) milliseconds")
+                .accessibilityLabel("TCP setup estimate, \(currentValueFor(.latency)) milliseconds")
 
                 // Quality card - tappable
                 Button { selectedStatType = .quality } label: { MiniStatCard(
@@ -472,10 +472,6 @@ public struct ConnectivityStatusView: View {
         case 50..<100: return .orange
         default: return .red
         }
-    }
-
-    private var connectionQuality: String {
-        return viewModel.signalQuality
     }
 
     private var qualityColor: Color {
@@ -542,7 +538,7 @@ public struct ConnectivityStatusView: View {
                         if check.isVPNActive {
                             Text("•")
                                 .foregroundStyle(.tertiary)
-                            Label("VPN", systemImage: "lock.shield.fill")
+                            Label("Possible VPN", systemImage: "lock.shield.fill")
                                 .font(.footnote)
                                 .foregroundStyle(.blue)
                         }
@@ -563,7 +559,7 @@ public struct ConnectivityStatusView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Recent activity: \(check.isReachable ? "Online" : "Offline"), \(viewModel.historyManager.timeSinceLastCheck() ?? "")"
+            "Recent activity: \(check.isReachable ? "Online" : (check.isConnected ? "Limited connectivity" : "Offline")), \(viewModel.historyManager.timeSinceLastCheck() ?? "")"
         )
         .accessibilityHint("Tap to view full history")
     }
@@ -642,8 +638,8 @@ public struct ConnectivityStatusView: View {
                     Divider()
                     NetworkInfoRow(
                         icon: "lock.shield.fill",
-                        label: "VPN Status",
-                        value: "Active",
+                        label: "VPN Detection",
+                        value: "Tunnel detected",
                         valueColor: .blue
                     )
                 }
@@ -698,53 +694,6 @@ public struct ConnectivityStatusView: View {
 }
 
 // MARK: - Supporting Views
-
-@available(iOS 17.0, *)
-struct ActionButton: View {
-    let title: String
-    let icon: String
-    let color: Color
-    let isLoading: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: icon)
-                        .font(.body.weight(.semibold))
-                }
-                Text(title)
-                    .font(.body.weight(.semibold))
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(
-                LinearGradient(
-                    colors: [color, color.opacity(0.8)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: color.opacity(0.3), radius: 8, x: 0, y: 4)
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-}
-
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.spring(response: 0.3), value: configuration.isPressed)
-    }
-}
 
 @available(iOS 17.0, *)
 struct MiniStatCard: View {

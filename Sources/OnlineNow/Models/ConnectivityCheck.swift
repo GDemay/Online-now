@@ -24,7 +24,7 @@ public final class ConnectivityCheck {
     /// Measured download speed in Mbps (nil if not measured)
     public var speedMbps: Double?
 
-    /// True network latency (TCP RTT) in milliseconds (nil if not measured)
+    /// TCP connection setup estimate in milliseconds (nil if not measured)
     public var rttMs: Double?
 
     /// HTTP response time in milliseconds (nil if not measured)

@@ -1,3 +1,5 @@
+> Historical first-submission notes. For the 1.2.0 candidate, use [AUDIT.md](AUDIT.md) and [TIPPING_SETUP_GUIDE.md](TIPPING_SETUP_GUIDE.md). The checklist below is not evidence of current release readiness.
+
 # App Store Submission Guide
 
 This document provides all the information and steps required to publish **Online Now** on the Apple App Store.

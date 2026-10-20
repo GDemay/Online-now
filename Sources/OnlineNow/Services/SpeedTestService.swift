@@ -32,8 +32,7 @@ public actor SpeedTestService {
             defer { try? FileManager.default.removeItem(at: fileURL) }
             guard !Task.isCancelled else { return failure("Speed test cancelled") }
             let elapsed = ProcessInfo.processInfo.systemUptime - start
-            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-            let bytes = (attributes[.size] as? NSNumber)?.intValue ?? 0
+            let bytes = try fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
             return Self.result(bytes: bytes, duration: elapsed, expectedBytes: expectedBytes,
                                response: response)
         } catch {

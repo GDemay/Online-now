@@ -21,7 +21,7 @@
       <BuildableProductRunnable runnableDebuggingMode="0">
          <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="F0170DDDF482329F9B489E04" BuildableName="OnlineNow.app" BlueprintName="OnlineNow" ReferencedContainer="container:OnlineNow.xcodeproj" />
       </BuildableProductRunnable>
-      <StoreKitConfigurationFileReference identifier="../../../Configuration.storekit" />
+      <StoreKitConfigurationFileReference identifier="../Configuration.storekit" />
    </LaunchAction>
    <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES">
       <BuildableProductRunnable runnableDebuggingMode="0">

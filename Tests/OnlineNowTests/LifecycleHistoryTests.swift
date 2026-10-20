@@ -18,6 +18,7 @@ final class LifecycleHistoryTests: XCTestCase {
 
     func testRetentionAndStatisticsUseAllRetainedChecks() throws {
         let (history, container) = try makeHistory()
+        defer { withExtendedLifetime(container) {} }
         for index in 0..<105 {
             history.saveCheck(ConnectivityCheck(
                 timestamp: Date(timeIntervalSince1970: Double(index)),
@@ -40,6 +41,7 @@ final class LifecycleHistoryTests: XCTestCase {
 
     func testHistoryKeepsDistinctTCPAndHTTPTimingsAndEscapesCSV() throws {
         let (history, container) = try makeHistory()
+        defer { withExtendedLifetime(container) {} }
         withExtendedLifetime(container) {
             history.recordCheck(
                 isConnected: true, connectionType: .wifi, isReachable: false,
@@ -88,6 +90,29 @@ final class LifecycleHistoryTests: XCTestCase {
         await viewModel.quickCheck()
         XCTAssertEqual(viewModel.state, .online)
         XCTAssertEqual(viewModel.signalQuality, "Unknown")
+        viewModel.stopMonitoring()
+    }
+
+    func testMissingOrFailedSpeedMeasurementDoesNotInventQuality() async {
+        let viewModel = makeViewModel()
+        viewModel.latencyMeasurement = {
+            LatencyResult(rttMs: nil, method: .tcp, endpoint: "Test", error: "Unavailable")
+        }
+        viewModel.speedMeasurement = {
+            SpeedTestResult(speedMbps: nil, bytesDownloaded: 0, durationSeconds: 0, error: nil)
+        }
+        viewModel.startMonitoring()
+        viewModel.applyNetworkSnapshot(connectedSnapshot, automaticallyCheck: false)
+        await viewModel.fullCheck()
+        XCTAssertEqual(viewModel.state, .online)
+        XCTAssertEqual(viewModel.signalQuality, "Unknown")
+        viewModel.speedMeasurement = {
+            SpeedTestResult(speedMbps: 100, bytesDownloaded: 1_000_000,
+                            durationSeconds: 1, error: "Incomplete download")
+        }
+        await viewModel.fullCheck()
+        XCTAssertEqual(viewModel.signalQuality, "Unknown")
+        XCTAssertEqual(viewModel.errorMessage, "Incomplete download")
         viewModel.stopMonitoring()
     }
 

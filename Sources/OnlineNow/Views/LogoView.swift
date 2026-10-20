@@ -35,7 +35,7 @@ public struct LogoView: View {
                     )
                 )
                 .frame(width: size, height: size)
-                .scaleEffect(pulseScale)
+                .scaleEffect(reduceMotion ? 1 : pulseScale)
 
             // Outer ring
             Circle()
@@ -51,7 +51,7 @@ public struct LogoView: View {
                     style: StrokeStyle(lineWidth: size * 0.06, lineCap: .round)
                 )
                 .frame(width: size * 0.7, height: size * 0.7)
-                .rotationEffect(.degrees(isAnimating ? rotation : 0))
+                .rotationEffect(.degrees(isAnimating && !reduceMotion ? rotation : 0))
 
             // Ring gap with checkmark
             if isOnline && !isAnimating {
@@ -75,7 +75,7 @@ public struct LogoView: View {
                         )
                     )
                     .frame(width: size * 0.5, height: size * 0.5)
-                    .scaleEffect(pulseScale)
+                    .scaleEffect(reduceMotion ? 1 : pulseScale)
 
                 // Main dot
                 Circle()
@@ -155,7 +155,7 @@ public struct LoadingRingView: View {
                     style: StrokeStyle(lineWidth: size * 0.06, lineCap: .round)
                 )
                 .frame(width: size * 0.7, height: size * 0.7)
-                .rotationEffect(.degrees(rotation))
+                .rotationEffect(.degrees(reduceMotion ? 0 : rotation))
 
             // Center pulsing dot
             Circle()

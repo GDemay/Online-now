@@ -472,7 +472,7 @@ struct HistoryRowView: View {
         }
 
         if check.isVPNActive {
-            parts.append("VPN active")
+            parts.append("Possible VPN detected")
         }
 
         return parts.joined(separator: ", ")
