@@ -41,4 +41,3 @@ final class BannerLifecycleTests: XCTestCase {
         XCTAssertNil(model.metadata.latencyMs)
     }
 }
-

@@ -36,10 +36,12 @@ is available in the execution environment.
 ## Verification performed
 
 - Swift 6.0.3 on Linux: the five Foundation transaction-ledger XCTest tests pass.
-- Six network service regression tests pass in a scratch Linux harness using the
-  service source with `FoundationNetworking` imported and the Apple-only
-  `waitsForConnectivity` setter omitted. This is a limited service check, not an
-  Apple build. No application source depends on those harness adaptations.
+- Thirteen network/retry regression tests pass in a scratch Linux harness using
+  the service source with `FoundationNetworking` imported, the Apple-only
+  `waitsForConnectivity` setter omitted, and Combine queue-observation types
+  replaced with no-op stand-ins. Retry, cancellation, timeout and measurement
+  logic are unchanged. This does not verify Apple networking or Combine behavior.
+  No application source depends on these harness adaptations.
 - Swift frontend parsing covers production, example, and test files in Debug
   and Release configurations. Parsing does not typecheck Apple APIs.
 - Project references, shared-scheme XML, plist/catalog contents, version/signing
@@ -54,7 +56,9 @@ is available in the execution environment.
 ## Unverified release requirements
 
 1. Run the committed iOS verification workflow or `scripts/verify_build.sh` on
-   a Mac. Inspect test results and screenshots; fix any Apple compiler/runtime
+   a Mac. No Actions run or Xcode Cloud check appeared for the candidate commits
+   after branch pushes and PR creation; the connected tools cannot dispatch or
+   enable the new workflow, or change Xcode Cloud workflow configuration. Inspect test results and screenshots; fix any Apple compiler/runtime
    findings before distributing the candidate.
 2. Test airplane mode, Wi-Fi/cellular changes, background/foreground, constrained
    networks, captive portals, and VoiceOver on a device. Deterministic fixtures

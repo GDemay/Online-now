@@ -96,5 +96,7 @@ schemes:
       - OnlineNowTests
       - OnlineNowUITests
       gatherCoverageData: true
+      commandLineArguments:
+        --unit-testing: true
     archive:
       config: Release

@@ -28,4 +28,3 @@ struct TipLedger: Codable, Equatable {
         return true
     }
 }
-

@@ -7,9 +7,21 @@ import SwiftData
 struct OnlineNowApp: App {
     @State private var storage = HistoryStorage.open()
 
+    private var isUnitTestHost: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--unit-testing")
+        #else
+        return false
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
-            if let container = storage.container {
+            if isUnitTestHost {
+                // Hosted unit tests create their own services. A live app listener
+                // could otherwise finish StoreKit transactions before a test sees them.
+                Color.clear
+            } else if let container = storage.container {
                 ConnectivityStatusView()
                     .modelContainer(container)
                     .safeAreaInset(edge: .bottom) {
@@ -49,7 +61,8 @@ private struct HistoryStorage {
     static func open() -> HistoryStorage {
         let schema = Schema([ConnectivityCheck.self])
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing")
+            || ProcessInfo.processInfo.arguments.contains("--unit-testing") {
             return HistoryStorage(
                 container: try? ModelContainer(for: schema, configurations: [
                     ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)

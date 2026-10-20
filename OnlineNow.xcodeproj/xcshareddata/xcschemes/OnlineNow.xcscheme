@@ -7,7 +7,10 @@
          </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
-   <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES" codeCoverageEnabled="YES">
+   <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="NO" codeCoverageEnabled="YES">
+      <CommandLineArguments>
+         <CommandLineArgument argument="--unit-testing" isEnabled="YES" />
+      </CommandLineArguments>
       <Testables>
          <TestableReference skipped="NO" parallelizable="NO">
             <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="C4A30E17AE9AFF4CDC8B0633" BuildableName="OnlineNowTests.xctest" BlueprintName="OnlineNowTests" ReferencedContainer="container:OnlineNow.xcodeproj" />
