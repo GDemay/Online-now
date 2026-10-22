@@ -427,9 +427,12 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         capture("tip-approved-once")
     }
 
-    func testVisualTipFailureAndRecovery() throws {
+    func testVisualTipFailureAndRecovery() async throws {
         let session = try configureStore()
-        session.failTransactionsEnabled = true
+        let simulatedFailure = SKTestFailures.Purchase.generic(.unknown)
+        try await session.setSimulatedError(simulatedFailure, forAPI: .purchase)
+        let configuredFailure = await session.simulatedError(forAPI: .purchase)
+        XCTAssertEqual(configuredFailure, simulatedFailure)
         launch(scenario: "offline")
         tap("navigation.tipJar")
         let purchase = app.buttons["tipJar.purchase"]
@@ -444,7 +447,9 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         XCTAssertEqual(recordedTipCount(), initialCount)
         scrollTo(error)
         capture("tip-purchase-failed-retry")
-        session.failTransactionsEnabled = false
+        try await session.setSimulatedError(nil, forAPI: .purchase)
+        let clearedFailure = await session.simulatedError(forAPI: .purchase)
+        XCTAssertNil(clearedFailure)
         scrollTo(purchase)
         purchase.tap()
         let thanks = app.alerts["Thank you!"]
@@ -455,8 +460,31 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         capture("tip-purchase-recovered")
     }
 
-    func testVisualTipCancellation() throws {
+    func testVisualTipCancellation() async throws {
         let session = try configureStore()
+        let cancellation = SKTestFailures.Purchase.generic(.userCancelled)
+        try await session.setSimulatedError(cancellation, forAPI: .purchase)
+        let configuredCancellation = await session.simulatedError(forAPI: .purchase)
+        XCTAssertEqual(configuredCancellation, cancellation)
+        launch(scenario: "offline")
+        tap("navigation.tipJar")
+        let simulatedPurchase = app.buttons["tipJar.purchase"]
+        require(simulatedPurchase, timeout: 15)
+        XCTAssertTrue(simulatedPurchase.waitForEnabled(timeout: 10))
+        let preCancellationCount = recordedTipCount()
+        scrollTo(simulatedPurchase)
+        simulatedPurchase.tap()
+        XCTAssertTrue(simulatedPurchase.waitForEnabled(timeout: 10))
+        XCTAssertEqual(recordedTipCount(), preCancellationCount)
+        XCTAssertFalse(app.alerts["Thank you!"].exists)
+        capture("tip-cancelled-storekit-response")
+        print("ONLINE_NOW_VISUAL_OBSERVATION storekit-user-cancellation-injected=true purchase-enabled=\(simulatedPurchase.isEnabled) credited=false error-message-visible=\(app.staticTexts["tipJar.error"].exists)")
+        try await session.setSimulatedError(nil, forAPI: .purchase)
+        let clearedCancellation = await session.simulatedError(forAPI: .purchase)
+        XCTAssertNil(clearedCancellation)
+        app.terminate()
+
+        // Separately observe real checkout dismissal when this simulator presents it.
         session.disableDialogs = false
         launch(scenario: "offline")
         tap("navigation.tipJar")
