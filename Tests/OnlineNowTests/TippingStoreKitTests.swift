@@ -30,45 +30,58 @@ final class TippingStoreKitTests: XCTestCase {
         let beforeRecovery = TippingManager(defaults: defaults, startsStoreKit: false)
         XCTAssertEqual(beforeRecovery.tipCount, 0)
 
-        // Simulate two actual StoreKit purchases while the app is not listening.
+        // Simulate an actual StoreKit purchase while the app is not listening.
         // This outside-app API does not require the unit host to present payment
         // UI. Purchases from the app, including Ask to Buy, run in the UI suite.
-        _ = try await session.buyProduct(identifier: productID)
-        _ = try await session.buyProduct(identifier: productID)
+        let firstPurchase = try await session.buyProduct(identifier: productID)
         let unfinished = session.allTransactions()
-        XCTAssertEqual(unfinished.count, 2)
-        XCTAssertEqual(Set(unfinished.map(\.identifier)).count, 2)
+        XCTAssertEqual(unfinished.count, 1)
         XCTAssertTrue(unfinished.allSatisfy { $0.state == .purchased })
         XCTAssertEqual(beforeRecovery.tipCount, 0)
 
         let manager = TippingManager(defaults: defaults, startsStoreKit: true)
         let recovered = try await waitUntil(timeout: 10) {
             // Products load only after the unfinished-transaction pass ends.
-            manager.tipCount == 2 && !manager.products.isEmpty && !manager.isLoading
+            manager.tipCount == 1 && !manager.products.isEmpty && !manager.isLoading
         }
-        XCTAssertTrue(recovered, "The two unfinished consumables were not recovered")
-        XCTAssertEqual(manager.tipCount, 2)
+        XCTAssertTrue(recovered, "The unfinished consumable was not recovered")
+        XCTAssertEqual(manager.tipCount, 1)
         XCTAssertTrue(manager.isSupporter)
         XCTAssertEqual(manager.products.first?.id, productID)
         XCTAssertEqual(manager.products.first?.type, .consumable)
 
-        // A subsequent outside-app purchase exercises Transaction.updates on
-        // the same manager, independently of its startup recovery pass.
-        _ = try await session.buyProduct(identifier: productID)
-        let updated = try await waitUntil(timeout: 10) { manager.tipCount == 3 }
+        // StoreKit permits another consumable of this SKU after the first has
+        // finished. This purchase exercises Transaction.updates independently
+        // of the completed startup recovery pass.
+        let secondPurchase = try await session.buyProduct(identifier: productID)
+        XCTAssertNotEqual(firstPurchase.id, secondPurchase.id)
+        let updated = try await waitUntil(timeout: 10) { manager.tipCount == 2 }
         XCTAssertTrue(updated, "The new consumable was not delivered through Transaction.updates")
-        XCTAssertEqual(manager.tipCount, 3)
-        XCTAssertEqual(session.allTransactions().count, 3)
+        XCTAssertEqual(manager.tipCount, 2)
+        let transactions = session.allTransactions()
+        XCTAssertEqual(transactions.count, 2)
+        XCTAssertEqual(Set(transactions.map(\.identifier)).count, 2)
+        let purchaseIDs = Set([firstPurchase.id, secondPurchase.id])
+        let finished = try await waitUntil(timeout: 10) {
+            for await result in Transaction.unfinished {
+                switch result {
+                case .verified(let transaction), .unverified(let transaction, _):
+                    if purchaseIDs.contains(transaction.id) { return false }
+                }
+            }
+            return true
+        }
+        XCTAssertTrue(finished, "Both consumables must finish after their recorded support is saved")
         let restarted = TippingManager(defaults: defaults, startsStoreKit: false)
-        XCTAssertEqual(restarted.tipCount, 3, "Recovered and live transactions must persist exactly once")
+        XCTAssertEqual(restarted.tipCount, 2, "Recovered and live transactions must persist exactly once")
     }
 
-    private func waitUntil(timeout: TimeInterval, _ condition: () -> Bool) async throws -> Bool {
+    private func waitUntil(timeout: TimeInterval, _ condition: () async -> Bool) async throws -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
-        while !condition(), Date() < deadline {
+        while !(await condition()), Date() < deadline {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
-        return condition()
+        return await condition()
     }
 }
 #endif
