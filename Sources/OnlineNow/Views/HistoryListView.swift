@@ -1,15 +1,23 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Displays the history of connectivity checks with premium design
 /// Note: Requires iOS 17+ for SwiftData integration
 @available(iOS 17.0, macOS 14.0, *)
 public struct HistoryListView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var historyManager: HistoryManager
     @State private var showClearConfirmation = false
+    @State private var showExport = false
+    @State private var exportDocument = HistoryCSVDocument(text: "")
+    @State private var exportError: String?
+    private let onExport: () -> Void
 
-    public init(historyManager: HistoryManager) {
+    public init(historyManager: HistoryManager, onExport: @escaping () -> Void = {}) {
         self.historyManager = historyManager
+        self.onExport = onExport
     }
 
     public var body: some View {
@@ -25,6 +33,26 @@ public struct HistoryListView: View {
             .navigationTitle("History")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if !historyManager.recentChecks.isEmpty {
+                        Button {
+                            do {
+                                exportDocument = HistoryCSVDocument(text: try historyManager.exportCSV())
+                                showExport = true
+                            } catch {
+                                exportError = error.localizedDescription
+                            }
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .frame(width: 44, height: 44)
+                        }
+                        .accessibilityLabel("Export history as CSV")
+                        .accessibilityIdentifier("history.export")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     if !historyManager.recentChecks.isEmpty {
                         Button(role: .destructive) {
@@ -33,12 +61,32 @@ public struct HistoryListView: View {
                             Image(systemName: "trash")
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(.red)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 44, height: 44)
                                 .background(.ultraThinMaterial, in: Circle())
                         }
                         .accessibilityLabel("Clear history")
+                        .accessibilityIdentifier("history.clear")
                     }
                 }
+            }
+            .fileExporter(
+                isPresented: $showExport,
+                document: exportDocument,
+                contentType: .commaSeparatedText,
+                defaultFilename: "Online-Now-History"
+            ) { result in
+                switch result {
+                case .success: onExport()
+                case .failure(let error): exportError = error.localizedDescription
+                }
+            }
+            .alert("Couldn't Export History", isPresented: Binding(
+                get: { exportError != nil },
+                set: { if !$0 { exportError = nil } }
+            )) {
+                Button("OK", role: .cancel) { exportError = nil }
+            } message: {
+                Text(exportError ?? "Please try again.")
             }
             .confirmationDialog(
                 "Clear History",
@@ -59,6 +107,12 @@ public struct HistoryListView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 16) {
+            if let error = historyManager.errorMessage {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+            }
             ZStack {
                 Circle()
                     .fill(Color.blue.opacity(0.1))
@@ -71,20 +125,27 @@ public struct HistoryListView: View {
 
             VStack(spacing: 8) {
                 Text("No History Yet")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.system(.title3, design: .rounded, weight: .bold))
 
                 Text("Your connectivity checks will appear here")
-                    .font(.system(size: 15))
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+        .accessibilityIdentifier("history.empty")
     }
 
     private var historyContent: some View {
         ScrollView {
             VStack(spacing: 20) {
+                if let error = historyManager.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                }
                 // Statistics cards
                 statisticsSection
 
@@ -101,13 +162,13 @@ public struct HistoryListView: View {
         let stats = historyManager.getStatistics()
 
         return VStack(alignment: .leading, spacing: 12) {
-            Text("Overview")
-                .font(.system(size: 15, weight: .semibold))
+            Text("Saved Checks Overview")
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.leading, 4)
 
             // Main stats row
-            HStack(spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4), spacing: 12) {
                 HistoryStatCard(
                     icon: "chart.line.uptrend.xyaxis",
                     value: "\(stats.totalChecks)",
@@ -123,12 +184,23 @@ public struct HistoryListView: View {
                 )
 
                 HistoryStatCard(
+                    icon: "exclamationmark.circle.fill",
+                    value: "\(stats.limitedCount)",
+                    title: "Limited",
+                    color: .orange
+                )
+
+                HistoryStatCard(
                     icon: "xmark.circle.fill",
                     value: "\(stats.offlineCount)",
                     title: "Offline",
                     color: .red
                 )
             }
+            Text("Showing the latest \(historyManager.recentChecks.count) checks. Summary and export include all \(stats.totalChecks) saved checks, up to 100.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             // Average speed if available
             if let avgSpeed = stats.averageSpeedMbps {
@@ -140,14 +212,14 @@ public struct HistoryListView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Average Speed")
-                            .font(.system(size: 13))
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
 
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(String(format: "%.1f", avgSpeed))
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .font(.system(.title2, design: .rounded, weight: .bold))
                             Text("Mbps")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.footnote.weight(.medium))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -156,7 +228,7 @@ public struct HistoryListView: View {
 
                     // Speed quality badge
                     Text(speedQuality(avgSpeed))
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -171,18 +243,18 @@ public struct HistoryListView: View {
 
     private func speedQuality(_ speed: Double) -> String {
         switch speed {
-        case 0..<5: return "Poor"
-        case 5..<25: return "Fair"
-        case 25..<100: return "Good"
-        default: return "Great"
+        case 0..<10: return "Poor"
+        case 10..<25: return "Fair"
+        case 25..<50: return "Good"
+        default: return "Excellent"
         }
     }
 
     private func speedQualityColor(_ speed: Double) -> Color {
         switch speed {
-        case 0..<5: return .red
-        case 5..<25: return .orange
-        case 25..<100: return .green
+        case 0..<10: return .red
+        case 10..<25: return .orange
+        case 25..<50: return .green
         default: return .blue
         }
     }
@@ -190,11 +262,11 @@ public struct HistoryListView: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recent Checks")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.leading, 4)
 
-            VStack(spacing: 1) {
+            LazyVStack(spacing: 1) {
                 ForEach(Array(historyManager.recentChecks.enumerated()), id: \.element.id) { index, check in
                     HistoryRowView(check: check)
                         .background(cardBackground)
@@ -265,11 +337,11 @@ struct HistoryStatCard: View {
                 .foregroundStyle(color)
 
             Text(value)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .font(.system(.title2, design: .rounded, weight: .bold))
                 .foregroundStyle(.primary)
 
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -301,7 +373,7 @@ struct HistoryRowView: View {
                     .frame(width: 40, height: 40)
 
                 Image(systemName: statusIcon)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(statusColor)
             }
 
@@ -309,7 +381,7 @@ struct HistoryRowView: View {
                 // Status and connection type
                 HStack(spacing: 6) {
                     Text(check.isReachable ? "Online" : (check.isConnected ? "Limited" : "Offline"))
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
 
                     Text("•")
                         .foregroundStyle(.tertiary)
@@ -326,8 +398,8 @@ struct HistoryRowView: View {
                 }
 
                 // Timestamp
-                Text(check.timestamp, style: .relative)
-                    .font(.system(size: 12))
+                Text(check.timestamp, format: .dateTime.month(.abbreviated).day().hour().minute().second())
+                    .font(.caption)
                     .foregroundStyle(.tertiary)
             }
 
@@ -337,10 +409,10 @@ struct HistoryRowView: View {
             if let speed = check.speedMbps {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(formatSpeed(speed))
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(.body, design: .rounded, weight: .bold))
                         .monospacedDigit()
                     Text("Mbps")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.caption2.weight(.medium))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -393,16 +465,33 @@ struct HistoryRowView: View {
         }
 
         parts.append("via \(check.connectionType)")
+        parts.append(check.timestamp.formatted(date: .abbreviated, time: .standard))
 
         if let speed = check.speedMbps {
             parts.append("Speed: \(formatSpeed(speed)) megabits per second")
         }
 
         if check.isVPNActive {
-            parts.append("VPN active")
+            parts.append("Possible VPN detected")
         }
 
         return parts.joined(separator: ", ")
+    }
+}
+
+/// CSV remains local until the user chooses a destination in the system exporter.
+private struct HistoryCSVDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.commaSeparatedText] }
+    var text: String
+
+    init(text: String) { self.text = text }
+
+    init(configuration: ReadConfiguration) throws {
+        text = String(decoding: configuration.file.regularFileContents ?? Data(), as: UTF8.self)
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
     }
 }
 

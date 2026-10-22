@@ -1,283 +1,225 @@
+import Combine
 import Foundation
 import StoreKit
 
-/// Manages tipping functionality using StoreKit 2
-/// Tracks supporter status and handles in-app purchases
+/// Handles the optional, repeatable tip using verified StoreKit 2 transactions.
 @available(iOS 15.0, macOS 12.0, *)
 @MainActor
 public final class TippingManager: ObservableObject {
-
-    // MARK: - Published Properties
-
-    @Published public var products: [Product] = []
-    @Published public var isLoading = false
+    @Published public private(set) var products: [Product] = []
+    @Published public private(set) var isLoading = false
     @Published public var errorMessage: String?
-    @Published public var isPurchasing = false
+    @Published public private(set) var isPurchasing = false
+    @Published public private(set) var isPending = false
+    @Published public private(set) var tipCount = 0
+    @Published public private(set) var isSupporter = false
+    @Published public private(set) var isPowerSupporter = false
 
-    // Supporter status
-    @Published public var totalTipsAmount: Double = 0
-    @Published public var tipCount: Int = 0
-    @Published public var isSupporter: Bool = false  // $5+ total
-    @Published public var isPowerSupporter: Bool = false  // $10+ total
+    /// Kept for source compatibility. Historic totals were not currency-aware;
+    /// new tips are counted rather than adding incompatible local currencies.
+    @available(*, deprecated, message: "Use tipCount; tips may use different currencies.")
+    public var totalTipsAmount: Double { defaults.double(forKey: "onlinenow.totalTips") }
 
-    // Tip prompts tracking
     @Published public var shouldShowTipPrompt = false
     @Published public var tipPromptTrigger: TipPromptTrigger?
 
-    // MARK: - Product IDs
-
-    private let productIDs: [String] = [
-        "onlinenow.gdemay"  // $1 donation
-    ]
-
-    // MARK: - UserDefaults Keys
-
-    private let totalTipsKey = "onlinenow.totalTips"
-    private let tipCountKey = "onlinenow.tipCount"
-    private let firstSpeedTestKey = "onlinenow.firstSpeedTest"
+    // Must exactly match the consumable configured in App Store Connect.
+    static let productIDs: Set<String> = ["onlinenow.gdemay"]
+    private static let ledgerKey = "onlinenow.tipLedger.v1"
+    private let defaults: UserDefaults
+    private var ledger: TipLedger
+    private var ledgerIsReadable = true
+    private var transactionListener: Task<Void, Never>?
+    private var startupTask: Task<Void, Never>?
     private let speedTestCountKey = "onlinenow.speedTestCount"
     private let historyExportCountKey = "onlinenow.historyExportCount"
     private let lastTipPromptKey = "onlinenow.lastTipPrompt"
 
-    // MARK: - Transaction Listener
+    public convenience init() {
+        self.init(defaults: .standard, startsStoreKit: true)
+    }
 
-    private var transactionListener: Task<Void, Error>?
+    /// Separate persistence and StoreKit startup so accounting can be tested
+    /// without contacting the App Store or modifying a user's defaults.
+    init(defaults: UserDefaults, startsStoreKit: Bool) {
+        self.defaults = defaults
+        if let data = defaults.data(forKey: Self.ledgerKey) {
+            do {
+                ledger = try JSONDecoder().decode(TipLedger.self, from: data)
+            } catch {
+                ledger = TipLedger()
+                ledgerIsReadable = false
+                errorMessage = "Your local tip history could not be read. Please contact support before sending another tip."
+            }
+        } else {
+            ledger = TipLedger(legacyTipCount: max(0, defaults.integer(forKey: "onlinenow.tipCount")))
+        }
+        refreshSupporterStatus()
 
-    // MARK: - Initialization
-
-    public init() {
-        // Load saved supporter status
-        loadSupporterStatus()
-
-        // Start transaction listener
-        transactionListener = listenForTransactions()
-
-        // Load products
-        Task {
-            await loadProducts()
+        guard startsStoreKit else { return }
+        // Listen before querying unfinished purchases so no delivery is missed.
+        transactionListener = Task { [weak self] in
+            for await result in Transaction.updates {
+                guard !Task.isCancelled else { return }
+                await self?.process(result)
+            }
+        }
+        startupTask = Task { [weak self] in
+            for await result in Transaction.unfinished {
+                guard !Task.isCancelled else { return }
+                await self?.process(result)
+            }
+            await self?.loadProducts()
         }
     }
 
     deinit {
         transactionListener?.cancel()
+        startupTask?.cancel()
     }
 
-    // MARK: - Product Loading
-
-    /// Load tip products from App Store
     public func loadProducts() async {
+        guard !isLoading, !isPurchasing else { return }
+        guard ledgerIsReadable else { return }
         isLoading = true
         errorMessage = nil
-
+        defer { isLoading = false }
         do {
-            let loadedProducts = try await Product.products(for: productIDs)
-            products = loadedProducts.sorted { $0.price < $1.price }
-            isLoading = false
+            let loaded = try await Product.products(for: Array(Self.productIDs))
+            products = loaded.filter {
+                Self.productIDs.contains($0.id) && $0.type == .consumable
+            }.sorted { $0.price < $1.price }
+            if products.isEmpty {
+                errorMessage = "Tipping is currently unavailable. Please try again later. All app features remain free."
+            }
         } catch {
-            errorMessage = "Failed to load tip options: \(error.localizedDescription)"
-            isLoading = false
-            print("❌ TippingManager: Failed to load products - \(error)")
+            products = []
+            errorMessage = "We couldn’t connect to the App Store. Check your connection and try again."
         }
     }
 
-    // MARK: - Purchase
-
-    /// Purchase a tip product
+    /// Returns true only after a verified tip has been saved locally and finished.
     public func purchase(_ product: Product) async -> Bool {
+        guard !isPurchasing, !isPending, ledgerIsReadable else { return false }
+        guard Self.productIDs.contains(product.id), product.type == .consumable else {
+            errorMessage = "This tip option is unavailable. Please reload the tip jar."
+            return false
+        }
         isPurchasing = true
+        errorMessage = nil
         defer { isPurchasing = false }
-
         do {
-            let result = try await product.purchase()
-
-            switch result {
-            case .success(let verification):
-                let transaction = try checkVerified(verification)
-
-                // Update supporter status
-                await recordTip(amount: product.price)
-
-                // Finish the transaction
-                await transaction.finish()
-
-                return true
-
+            switch try await product.purchase() {
+            case .success(let result):
+                return await process(result)
             case .userCancelled:
                 return false
-
             case .pending:
-                errorMessage = "Purchase is pending approval"
+                isPending = true
                 return false
-
             @unknown default:
+                errorMessage = "The App Store hasn’t confirmed this tip. Please try again later."
                 return false
             }
         } catch {
-            errorMessage = "Purchase failed: \(error.localizedDescription)"
-            print("❌ TippingManager: Purchase failed - \(error)")
+            errorMessage = "Your tip couldn’t be completed. Please try again."
             return false
         }
     }
 
-    /// Check transaction verification
-    private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
-        switch result {
-        case .unverified:
-            throw TippingError.failedVerification
-        case .verified(let safe):
-            return safe
+    @discardableResult
+    private func process(_ result: VerificationResult<Transaction>) async -> Bool {
+        guard case .verified(let transaction) = result else {
+            errorMessage = "The App Store couldn’t verify this tip. Please try again later."
+            return false
+        }
+        guard Self.productIDs.contains(transaction.productID), transaction.productType == .consumable else {
+            // Other StoreKit consumers must finish their own transactions.
+            return false
+        }
+        guard ledgerIsReadable else { return false }
+        let isRevoked = transaction.revocationDate != nil
+        do {
+            try recordVerifiedTip(id: transaction.id, productID: transaction.productID, isRevoked: isRevoked)
+            // Persist before finishing, so interruption causes safe redelivery.
+            await transaction.finish()
+            isPending = false
+            return !isRevoked
+        } catch {
+            errorMessage = "Your purchase is safe with the App Store, but we couldn’t save its confirmation. Reopen the app to try again."
+            return false
         }
     }
 
-    // MARK: - Transaction Listener
-
-    /// Listen for transaction updates
-    private func listenForTransactions() -> Task<Void, Error> {
-        return Task.detached { [weak self] in
-            for await result in Transaction.updates {
-                guard let self = self else { return }
-
-                do {
-                    // Check verification in detached context
-                    let transaction: Transaction
-                    switch result {
-                    case .unverified:
-                        throw TippingError.failedVerification
-                    case .verified(let safe):
-                        transaction = safe
-                    }
-
-                    // Update supporter status on main actor
-                    let amount = transaction.price ?? 0
-                    await self.recordTip(amount: amount)
-
-                    await transaction.finish()
-                } catch {
-                    print("❌ TippingManager: Transaction update failed - \(error)")
-                }
-            }
-        }
+    /// Shared by purchase results, delayed approvals, and unfinished redelivery.
+    @discardableResult
+    func recordVerifiedTip(id: UInt64, productID: String, isRevoked: Bool) throws -> Bool {
+        guard Self.productIDs.contains(productID), ledgerIsReadable else { return false }
+        var nextLedger = ledger
+        let changed = nextLedger.record(id: id, productID: productID, isRevoked: isRevoked)
+        guard changed else { return false }
+        let data = try JSONEncoder().encode(nextLedger)
+        defaults.set(data, forKey: Self.ledgerKey)
+        ledger = nextLedger
+        refreshSupporterStatus()
+        return true
     }
 
-    // MARK: - Supporter Status
-
-    /// Record a tip and update supporter status
-    private func recordTip(amount: Decimal) async {
-        let doubleAmount = NSDecimalNumber(decimal: amount).doubleValue
-
-        totalTipsAmount += doubleAmount
-        tipCount += 1
-
-        // Update supporter badges
-        isSupporter = totalTipsAmount >= 5.0
-        isPowerSupporter = totalTipsAmount >= 10.0
-
-        // Save to UserDefaults
-        UserDefaults.standard.set(totalTipsAmount, forKey: totalTipsKey)
-        UserDefaults.standard.set(tipCount, forKey: tipCountKey)
-
-        print("💰 TippingManager: Tip recorded - $\(doubleAmount) (Total: $\(totalTipsAmount))")
+    private func refreshSupporterStatus() {
+        tipCount = ledger.tipCount
+        isSupporter = tipCount > 0
+        isPowerSupporter = tipCount >= 10
     }
 
-    /// Load supporter status from UserDefaults
-    private func loadSupporterStatus() {
-        totalTipsAmount = UserDefaults.standard.double(forKey: totalTipsKey)
-        tipCount = UserDefaults.standard.integer(forKey: tipCountKey)
-        isSupporter = totalTipsAmount >= 5.0
-        isPowerSupporter = totalTipsAmount >= 10.0
-    }
-
-    /// Reset supporter status (for testing)
+    /// Reset local status for test tooling. Never called from the purchase UI.
     public func resetSupporterStatus() {
-        totalTipsAmount = 0
-        tipCount = 0
-        isSupporter = false
-        isPowerSupporter = false
-        UserDefaults.standard.removeObject(forKey: totalTipsKey)
-        UserDefaults.standard.removeObject(forKey: tipCountKey)
+        ledger = TipLedger()
+        ledgerIsReadable = true
+        defaults.removeObject(forKey: Self.ledgerKey)
+        defaults.removeObject(forKey: "onlinenow.totalTips")
+        defaults.removeObject(forKey: "onlinenow.tipCount")
+        refreshSupporterStatus()
     }
 
-    // MARK: - Tip Prompt Triggers
-
-    /// Record that a speed test was completed
     public func recordSpeedTestCompleted() {
-        let count = UserDefaults.standard.integer(forKey: speedTestCountKey)
-        let newCount = count + 1
-        UserDefaults.standard.set(newCount, forKey: speedTestCountKey)
-
-        // Show tip prompt after first speed test (if not supporter)
-        if newCount == 1 && !isSupporter {
-            checkAndShowTipPrompt(trigger: .firstSpeedTest)
-        }
-        // Show tip prompt every 10 speed tests
-        else if newCount % 10 == 0 && !isPowerSupporter {
+        let count = defaults.integer(forKey: speedTestCountKey) + 1
+        defaults.set(count, forKey: speedTestCountKey)
+        // Let people finish their first test without immediately asking for money.
+        if count >= 10, count % 10 == 0, !isSupporter {
             checkAndShowTipPrompt(trigger: .frequentUser)
         }
     }
 
-    /// Record that history was exported
     public func recordHistoryExported() {
-        let count = UserDefaults.standard.integer(forKey: historyExportCountKey)
-        UserDefaults.standard.set(count + 1, forKey: historyExportCountKey)
-
-        // Show tip prompt after first export (if not supporter)
-        if count == 0 && !isSupporter {
-            checkAndShowTipPrompt(trigger: .historyExport)
-        }
+        let count = defaults.integer(forKey: historyExportCountKey) + 1
+        defaults.set(count, forKey: historyExportCountKey)
     }
 
-    /// Check if enough time has passed since last tip prompt
     private func checkAndShowTipPrompt(trigger: TipPromptTrigger) {
+        guard !shouldShowTipPrompt, !isSupporter else { return }
         let now = Date()
-
-        // Don't show prompts more than once per day
-        if let lastPrompt = UserDefaults.standard.object(forKey: lastTipPromptKey) as? Date {
-            let daysSinceLastPrompt =
-                Calendar.current.dateComponents([.day], from: lastPrompt, to: now).day ?? 0
-            if daysSinceLastPrompt < 1 {
-                return
-            }
+        if let lastPrompt = defaults.object(forKey: lastTipPromptKey) as? Date,
+           now.timeIntervalSince(lastPrompt) < 7 * 24 * 60 * 60 {
+            return
         }
-
-        // Show the prompt
         tipPromptTrigger = trigger
         shouldShowTipPrompt = true
-        UserDefaults.standard.set(now, forKey: lastTipPromptKey)
+        defaults.set(now, forKey: lastTipPromptKey)
     }
 
-    /// Dismiss tip prompt
     public func dismissTipPrompt() {
         shouldShowTipPrompt = false
         tipPromptTrigger = nil
     }
 
-    // MARK: - Helper Methods
-
-    /// Get supporter badge text
     public var supporterBadge: String? {
-        if isPowerSupporter {
-            return "⭐️ Power Supporter"
-        } else if isSupporter {
-            return "💙 Supporter"
-        }
-        return nil
+        isPowerSupporter ? "⭐️ Power Supporter" : (isSupporter ? "💙 Supporter" : nil)
     }
 
-    /// Get impact message based on total tips
     public var impactMessage: String {
-        if totalTipsAmount >= 20 {
-            return "Your incredible support is helping build the ISP comparison feature!"
-        } else if totalTipsAmount >= 10 {
-            return "Your generous support is funding new analytics features!"
-        } else if totalTipsAmount >= 5 {
-            return "Your support is helping improve the app!"
-        } else {
-            return "Your tip will help fund new features like ISP comparison and WiFi ratings!"
-        }
+        "Thank you for helping maintain Online Now. Every feature remains free for everyone."
     }
 }
-
-// MARK: - Supporting Types
 
 @available(iOS 15.0, macOS 12.0, *)
 public enum TipPromptTrigger {
@@ -285,28 +227,9 @@ public enum TipPromptTrigger {
     case historyExport
     case frequentUser
 
-    var title: String {
-        switch self {
-        case .firstSpeedTest:
-            return "Enjoying OnlineNow?"
-        case .historyExport:
-            return "Thanks for using OnlineNow!"
-        case .frequentUser:
-            return "You're a power user!"
-        }
-    }
-
+    var title: String { "Support Online Now" }
     var message: String {
-        switch self {
-        case .firstSpeedTest:
-            return
-                "Your first speed test is complete! If you find this useful, consider buying me a coffee. ☕️"
-        case .historyExport:
-            return "Glad you're finding the history useful! Support development with a quick tip."
-        case .frequentUser:
-            return
-                "You've been using OnlineNow a lot! Your support helps keep the app free for everyone."
-        }
+        "Finding Online Now useful? An optional tip helps keep the app maintained. Every feature remains free."
     }
 }
 

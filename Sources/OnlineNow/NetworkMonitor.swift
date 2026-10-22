@@ -3,120 +3,91 @@ import Network
 import SystemConfiguration
 import Combine
 
-/// A monitor that observes network connectivity status in real-time
-/// Supports iOS 15+, macOS 12+, watchOS 8+
+/// A coherent path snapshot, published after all path properties have been updated.
+public struct NetworkPathSnapshot: Equatable, Sendable {
+    public let isConnected: Bool
+    public let connectionType: ConnectionType
+    public let isVPNActive: Bool
+    public let isConstrained: Bool
+    public let isExpensive: Bool
+}
+
+/// Observes network interfaces. Reachability still requires an internet probe.
 @available(iOS 15.0, macOS 12.0, watchOS 8.0, *)
+@MainActor
 public class NetworkMonitor: ObservableObject {
-    private let monitor = NWPathMonitor()
-    private let queue = DispatchQueue(label: "NetworkMonitor")
+    // A cancelled NWPathMonitor cannot be started again.
+    private var monitor: NWPathMonitor?
+    private let queue = DispatchQueue(label: "OnlineNow.NetworkMonitor")
+    private var generation = UUID()
 
-    /// Whether the device has network connectivity
-    @Published public private(set) var isConnected: Bool = false
+    @Published public private(set) var isConnected = false
+    @Published public private(set) var connectionType: ConnectionType = .none
+    @Published public private(set) var isVPNActive = false
+    @Published public private(set) var isConstrained = false
+    @Published public private(set) var isExpensive = false
+    @Published public private(set) var snapshot: NetworkPathSnapshot?
+    public var isMonitoring: Bool { monitor != nil }
 
-    /// Current connection type (uses OnlineNow's unified ConnectionType)
-    @Published public private(set) var connectionType: ConnectionType = .unknown
+    public init() {}
 
-    /// Whether a VPN is currently active
-    @Published public private(set) var isVPNActive: Bool = false
+    deinit { monitor?.cancel() }
 
-    /// Whether the connection is constrained (e.g., Low Data Mode)
-    @Published public private(set) var isConstrained: Bool = false
-
-    /// Whether the connection is expensive (cellular or personal hotspot)
-    @Published public private(set) var isExpensive: Bool = false
-
-    /// Current network path for detailed inspection
-    private var currentPath: NWPath?
-
-    public init() {
-        monitor.pathUpdateHandler = { [weak self] path in
-            DispatchQueue.main.async {
-                self?.currentPath = path
-                self?.isConnected = path.status == .satisfied
-                self?.isConstrained = path.isConstrained
-                self?.isExpensive = path.isExpensive
-                self?.updateConnectionType(path)
-                self?.updateVPNStatus()
-            }
-        }
-    }
-
-    /// Starts monitoring network connectivity
+    /// Idempotent, and safe to call again after stop().
     public func start() {
-        monitor.start(queue: queue)
+        guard monitor == nil else { return }
+        generation = UUID()
+        let currentGeneration = generation
+        let newMonitor = NWPathMonitor()
+        monitor = newMonitor
+        newMonitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor [weak self] in
+                guard let self, self.generation == currentGeneration, self.monitor != nil else { return }
+                let connected = path.status == .satisfied
+                let type: ConnectionType
+                if !connected { type = .none }
+                else if path.usesInterfaceType(.wifi) { type = .wifi }
+                else if path.usesInterfaceType(.cellular) { type = .cellular }
+                else if path.usesInterfaceType(.wiredEthernet) { type = .ethernet }
+                else { type = .unknown }
+
+                self.isConnected = connected
+                self.connectionType = type
+                self.isConstrained = path.isConstrained
+                self.isExpensive = path.isExpensive
+                self.isVPNActive = connected && self.checkVPNActive()
+                self.snapshot = NetworkPathSnapshot(
+                    isConnected: connected, connectionType: type,
+                    isVPNActive: self.isVPNActive,
+                    isConstrained: path.isConstrained, isExpensive: path.isExpensive
+                )
+            }
+        }
+        newMonitor.start(queue: queue)
     }
 
-    /// Stops monitoring network connectivity
     public func stop() {
-        monitor.cancel()
+        generation = UUID() // Ignore callbacks already queued by the old monitor.
+        monitor?.pathUpdateHandler = nil
+        monitor?.cancel()
+        monitor = nil
     }
 
-    private func updateConnectionType(_ path: NWPath) {
-        // If not connected at all (airplane mode, no network), report as none
-        if path.status != .satisfied {
-            connectionType = .unknown
-            return
-        }
-
-        if path.usesInterfaceType(.wifi) {
-            connectionType = .wifi
-        } else if path.usesInterfaceType(.cellular) {
-            connectionType = .cellular
-        } else if path.usesInterfaceType(.wiredEthernet) {
-            connectionType = .ethernet
-        } else {
-            connectionType = .unknown
-        }
-    }
-
-    /// Detects if a VPN is currently active by checking network interfaces
-    private func updateVPNStatus() {
-        isVPNActive = checkVPNActive()
-    }
-
-    /// Checks for active VPN by examining network interfaces
+    /// Best-effort tunnel detection. iOS does not expose an authoritative VPN status API.
     private func checkVPNActive() -> Bool {
-        // Check for VPN interface types in the current path
-        if let path = currentPath {
-            // VPNs typically use "other" interface type
-            if path.usesInterfaceType(.other) {
-                return true
-            }
+        guard let settings = CFNetworkCopySystemProxySettings()?.takeRetainedValue() as? [String: Any],
+              let scoped = settings["__SCOPED__"] as? [String: Any] else { return false }
+        let prefixes = ["tap", "tun", "ppp", "ipsec", "utun"]
+        return scoped.keys.contains { name in
+            prefixes.contains { name.lowercased().hasPrefix($0) }
         }
-
-        // Additional check using network interfaces
-        guard let cfDict = CFNetworkCopySystemProxySettings()?.takeRetainedValue() as? [String: Any],
-              let scoped = cfDict["__SCOPED__"] as? [String: Any] else {
-            return false
-        }
-
-        // Look for common VPN interface names
-        let vpnInterfacePatterns = ["tap", "tun", "ppp", "ipsec", "utun"]
-        for key in scoped.keys {
-            for pattern in vpnInterfacePatterns {
-                if key.lowercased().contains(pattern) {
-                    return true
-                }
-            }
-        }
-
-        return false
     }
 
-    /// Returns a summary of the current network state
     public var networkSummary: String {
         guard isConnected else { return "Not connected" }
-
-        var summary = connectionType.rawValue
-
-        if isVPNActive {
-            summary += " + VPN"
-        }
-
-        if isConstrained {
-            summary += " (Low Data Mode)"
-        }
-
-        return summary
+        var result = connectionType.displayName
+        if isVPNActive { result += " + Possible VPN" }
+        if isConstrained { result += " (Low Data Mode)" }
+        return result
     }
 }

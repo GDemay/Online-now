@@ -1,8 +1,8 @@
 import Foundation
 import Network
 
-/// Service for measuring true network latency (RTT) using TCP connection timing
-/// Provides accurate network latency measurements excluding HTTP/DNS overhead
+/// Measures TCP connection setup time. Hostname endpoints include DNS resolution;
+/// even IP endpoints include local scheduling and are an estimate of network RTT.
 @available(iOS 15.0, macOS 12.0, watchOS 8.0, *)
 public actor LatencyMeasurementService {
 
@@ -40,106 +40,44 @@ public actor LatencyMeasurementService {
     private let timeout: TimeInterval
 
     public init(timeout: TimeInterval = 3.0) {
-        self.timeout = timeout
+        self.timeout = timeout.isFinite ? min(30, max(0.1, timeout)) : 3
     }
 
-    /// Measures TCP connection latency to the specified endpoint
-    /// This measures pure network RTT by timing TCP SYN -> SYN-ACK handshake
-    /// - Parameters:
-    ///   - endpoint: The endpoint to measure latency to
-    /// - Returns: LatencyResult with RTT measurement
+    /// Measures TCP connection setup time with a deadline and cancellation support.
     public func measureTCPLatency(to endpoint: LatencyEndpoint) async -> LatencyResult {
-        let host = NWEndpoint.Host(endpoint.rawValue)
-        let port = NWEndpoint.Port(rawValue: endpoint.port)!
-
-        let connection = NWConnection(
-            host: host,
-            port: port,
-            using: .tcp
-        )
-
-        let startTime = Date()
-        var connectionEstablished = false
-        var error: String?
-
-        return await withCheckedContinuation { continuation in
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    // Connection established - measure latency
-                    let elapsed = Date().timeIntervalSince(startTime) * 1000
-                    connectionEstablished = true
-                    connection.cancel()
-
-                    continuation.resume(
-                        returning: LatencyResult(
-                            rttMs: elapsed,
-                            method: .tcp,
-                            endpoint: endpoint.displayName,
-                            error: nil
-                        ))
-
-                case .failed(let err):
-                    connection.cancel()
-                    if !connectionEstablished {
-                        continuation.resume(
-                            returning: LatencyResult(
-                                rttMs: nil,
-                                method: .tcp,
-                                endpoint: endpoint.displayName,
-                                error: "Connection failed: \(err.localizedDescription)"
-                            ))
-                    }
-
-                case .cancelled:
-                    if !connectionEstablished {
-                        connection.cancel()
-                        continuation.resume(
-                            returning: LatencyResult(
-                                rttMs: nil,
-                                method: .tcp,
-                                endpoint: endpoint.displayName,
-                                error: "Connection cancelled"
-                            ))
-                    }
-
-                case .waiting(let err):
-                    // Timeout handling
-                    Task {
-                        try? await Task.sleep(nanoseconds: UInt64(self.timeout * 1_000_000_000))
-                        if !connectionEstablished {
-                            connection.cancel()
-                            continuation.resume(
-                                returning: LatencyResult(
-                                    rttMs: nil,
-                                    method: .tcp,
-                                    endpoint: endpoint.displayName,
-                                    error: "Connection timeout: \(err.localizedDescription)"
-                                ))
-                        }
-                    }
-
-                default:
-                    break
-                }
-            }
-
-            connection.start(queue: .global())
+        guard !Task.isCancelled else {
+            return LatencyResult(rttMs: nil, method: .tcp, endpoint: endpoint.displayName,
+                                 error: "Connection cancelled")
         }
+        let probe = TCPConnectionProbe(endpoint: endpoint, timeout: timeout)
+        return await withTaskCancellationHandler(operation: {
+            await withCheckedContinuation { continuation in
+                probe.start(continuation)
+            }
+        }, onCancel: { probe.cancel() })
     }
 
     /// Measures average latency across multiple endpoints for more reliable results
     /// - Parameter count: Number of measurements to take
     /// - Returns: Average latency result
     public func measureAverageLatency(samples count: Int = 3) async -> LatencyResult {
+        guard count > 0 else {
+            return LatencyResult(rttMs: nil, method: .tcp, endpoint: "Multiple endpoints",
+                                 error: "At least one sample is required")
+        }
         let endpoints: [LatencyEndpoint] = [.cloudflare, .googleDNS, .google]
         var successfulMeasurements: [Double] = []
         var errors: [String] = []
 
         // Take multiple measurements
-        for _ in 0..<count {
+        for _ in 0..<min(count, 10) {
+            guard !Task.isCancelled else {
+                return LatencyResult(rttMs: nil, method: .tcp, endpoint: "Multiple endpoints",
+                                     error: "Measurement cancelled")
+            }
             // Rotate through endpoints
             for endpoint in endpoints {
+                guard !Task.isCancelled else { break }
                 let result = await measureTCPLatency(to: endpoint)
                 if let rtt = result.rttMs {
                     successfulMeasurements.append(rtt)
@@ -174,7 +112,12 @@ public actor LatencyMeasurementService {
     /// - Parameter urlString: URL to test
     /// - Returns: LatencyResult with full HTTP response time
     public func measureHTTPResponseTime(url urlString: String) async -> LatencyResult {
-        guard let url = URL(string: urlString) else {
+        guard !Task.isCancelled else {
+            return LatencyResult(rttMs: nil, method: .http, endpoint: urlString,
+                                 error: "Measurement cancelled")
+        }
+        guard let url = URL(string: urlString),
+              url.scheme?.lowercased() == "https", url.host != nil else {
             return LatencyResult(
                 rttMs: nil,
                 method: .http,
@@ -185,6 +128,7 @@ public actor LatencyMeasurementService {
 
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = timeout
+        config.timeoutIntervalForResource = timeout
         config.waitsForConnectivity = false
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         config.urlCache = nil
@@ -196,12 +140,17 @@ public actor LatencyMeasurementService {
             var request = URLRequest(url: url)
             request.httpMethod = "HEAD"
 
-            let startTime = Date()
+            let startTime = ProcessInfo.processInfo.systemUptime
             let (_, response) = try await session.data(for: request)
-            let elapsed = Date().timeIntervalSince(startTime) * 1000
+            let elapsed = (ProcessInfo.processInfo.systemUptime - startTime) * 1000
+            guard !Task.isCancelled else {
+                return LatencyResult(rttMs: nil, method: .http, endpoint: url.host ?? urlString,
+                                     error: "Measurement cancelled")
+            }
 
             guard let httpResponse = response as? HTTPURLResponse,
-                (200...399).contains(httpResponse.statusCode)
+                (200...299).contains(httpResponse.statusCode),
+                response.url?.host == url.host
             else {
                 return LatencyResult(
                     rttMs: nil,
@@ -229,6 +178,71 @@ public actor LatencyMeasurementService {
     }
 }
 
+/// All NWConnection callbacks, deadline, and cancellation are serialized on this
+/// queue. Completion clears the continuation before cancelling the connection,
+/// preventing a second resume from the subsequent `.cancelled` callback.
+@available(iOS 15.0, macOS 12.0, watchOS 8.0, *)
+private final class TCPConnectionProbe: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "com.gdemay.onlinenow.tcp-probe")
+    private let connection: NWConnection
+    private let endpoint: LatencyMeasurementService.LatencyEndpoint
+    private let timeout: TimeInterval
+    private var continuation: CheckedContinuation<LatencyResult, Never>?
+    private var deadline: DispatchWorkItem?
+    private var cancelled = false
+    private var startTime: TimeInterval = 0
+
+    init(endpoint: LatencyMeasurementService.LatencyEndpoint, timeout: TimeInterval) {
+        self.endpoint = endpoint
+        self.timeout = timeout
+        self.connection = NWConnection(host: NWEndpoint.Host(endpoint.rawValue),
+                                       port: NWEndpoint.Port(rawValue: endpoint.port)!, using: .tcp)
+    }
+
+    func start(_ continuation: CheckedContinuation<LatencyResult, Never>) {
+        queue.async {
+            self.continuation = continuation
+            guard !self.cancelled else { self.finish(error: "Connection cancelled"); return }
+            self.startTime = ProcessInfo.processInfo.systemUptime
+            self.connection.stateUpdateHandler = { [weak self] state in
+                guard let self = self else { return }
+                switch state {
+                case .ready: self.finish(error: nil)
+                case .failed(let error): self.finish(error: "Connection failed: \(error.localizedDescription)")
+                case .cancelled: self.finish(error: "Connection cancelled")
+                default: break
+                }
+            }
+            let deadline = DispatchWorkItem { [weak self] in
+                self?.finish(error: "Connection timed out")
+            }
+            self.deadline = deadline
+            self.queue.asyncAfter(deadline: .now() + self.timeout, execute: deadline)
+            self.connection.start(queue: self.queue)
+        }
+    }
+
+    func cancel() {
+        queue.async {
+            self.cancelled = true
+            self.finish(error: "Connection cancelled")
+        }
+    }
+
+    private func finish(error: String?) {
+        guard let continuation = continuation else { return }
+        self.continuation = nil
+        deadline?.cancel()
+        deadline = nil
+        connection.stateUpdateHandler = nil
+        connection.cancel()
+        let elapsed = (ProcessInfo.processInfo.systemUptime - startTime) * 1000
+        continuation.resume(returning: LatencyResult(rttMs: error == nil ? elapsed : nil,
+                                                     method: .tcp, endpoint: endpoint.displayName,
+                                                     error: error))
+    }
+}
+
 // MARK: - Result Types
 
 /// Result of a latency measurement
@@ -247,7 +261,7 @@ public struct LatencyResult: Sendable {
 
     /// Quality description based on latency
     public var qualityDescription: String {
-        guard let rtt = rttMs else { return "Unknown" }
+        guard let rtt = rttMs, rtt.isFinite, rtt >= 0 else { return "Unknown" }
 
         switch rtt {
         case 0..<20:
@@ -267,7 +281,7 @@ public struct LatencyResult: Sendable {
 
     /// Formatted latency string
     public var formattedLatency: String {
-        guard let rtt = rttMs else { return "—" }
+        guard let rtt = rttMs, rtt.isFinite, rtt >= 0 else { return "—" }
         return String(format: "%.0f ms", rtt)
     }
 

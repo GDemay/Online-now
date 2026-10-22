@@ -1,307 +1,191 @@
 import StoreKit
 import SwiftUI
 
-/// Beautiful tip jar view for supporting the developer
+/// Optional tips never gate an app feature or start a subscription.
 @available(iOS 15.0, macOS 12.0, *)
 public struct TipJarView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject var tippingManager: TippingManager
-
-    @State private var selectedProduct: Product?
+    @ObservedObject private var tippingManager: TippingManager
+    @State private var selectedProductID: String?
     @State private var showThankYou = false
-    @State private var purchaseSuccess = false
 
     public init(tippingManager: TippingManager) {
         self.tippingManager = tippingManager
     }
 
     public var body: some View {
-        #if os(macOS)
-            NavigationView {
-                scrollContent
-            }
-        #else
-            NavigationStack {
-                scrollContent
-            }
-        #endif
-    }
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    Image(systemName: "heart.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(.blue)
+                        .accessibilityHidden(true)
 
-    private var scrollContent: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Header with icon
-                headerSection
+                    VStack(spacing: 12) {
+                        Text("Support Online Now")
+                            .font(.title.bold())
+                            .accessibilityAddTraits(.isHeader)
+                        Text("An optional tip helps keep the app maintained. Every feature stays free, whether you tip or not.")
+                            .foregroundStyle(.secondary)
+                    }
+                    .multilineTextAlignment(.center)
 
-                // Impact message
-                impactSection
+                    VStack(alignment: .leading, spacing: 12) {
+                        ImpactRow(icon: "hammer.fill", text: "Support maintenance and bug fixes")
+                        ImpactRow(icon: "checkmark.circle", text: "A one-time purchase, with no subscription")
+                        ImpactRow(icon: "lock.shield", text: "Payment is handled securely by the App Store")
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.blue.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
 
-                // Tip options
-                if tippingManager.isLoading {
-                    ProgressView()
-                        .frame(height: 200)
-                } else {
-                    tipOptionsSection
+                    purchaseSection
+
+                    if tippingManager.tipCount > 0 {
+                        VStack(spacing: 8) {
+                            Label("Thank you for your support", systemImage: "heart.fill")
+                                .font(.headline)
+                            Text("\(tippingManager.tipCount) tip\(tippingManager.tipCount == 1 ? "" : "s") recorded on this device")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text("Consumable tips cannot be restored after reinstalling the app.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .multilineTextAlignment(.center)
+                        .accessibilityElement(children: .combine)
+                    }
                 }
-
-                // Total support
-                if tippingManager.tipCount > 0 {
-                    totalSupportSection
-                }
-
-                Spacer(minLength: 40)
+                .padding(24)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-        }
-        .background(backgroundColor)
-        #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
+            .navigationTitle("Tip jar")
             #if os(iOS)
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-            #else
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
+            .navigationBarTitleDisplayMode(.inline)
             #endif
-        }
-        .alert("Thank You! 💙", isPresented: $showThankYou) {
-            Button("Continue") {
-                if purchaseSuccess {
-                    dismiss()
+            .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") { dismiss() }
+                        .accessibilityIdentifier("tipJar.close")
                 }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+                #endif
             }
-        } message: {
-            Text(tippingManager.impactMessage)
+            .alert("Thank you!", isPresented: $showThankYou) {
+                Button("Done", role: .cancel) {}
+            } message: {
+                Text(tippingManager.impactMessage)
+            }
         }
-        .alert("Error", isPresented: .constant(tippingManager.errorMessage != nil)) {
-            Button("OK") {
-                tippingManager.errorMessage = nil
-            }
-        } message: {
-            if let error = tippingManager.errorMessage {
-                Text(error)
-            }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
+        .task {
+            if tippingManager.products.isEmpty { await tippingManager.loadProducts() }
         }
+        .accessibilityIdentifier("tipJar.screen")
     }
 
-    // MARK: - Header Section
-
-    private var headerSection: some View {
-        VStack(spacing: 12) {
-            // Coffee icon
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.blue.opacity(0.2), .purple.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 80, height: 80)
-
-                Image(systemName: "cup.and.saucer.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-
-            Text("Support OnlineNow")
-                .font(.title.bold())
-
-            Text(
-                "Buy me a coffee! Your support helps keep development going. No benefits, just gratitude!"
-            )
-            .font(.body)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-        }
-    }
-
-    // MARK: - Impact Section
-
-    private var impactSection: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "heart.fill")
-                    .foregroundStyle(.pink)
-                Text("Your Support Helps")
+    @ViewBuilder
+    private var purchaseSection: some View {
+        VStack(spacing: 16) {
+            if tippingManager.isPending {
+                Label("Waiting for approval", systemImage: "clock")
                     .font(.headline)
+                Text("The App Store is waiting for approval. Your support will appear here when the purchase is confirmed.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("tipJar.pending")
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                ImpactRow(icon: "hammer.fill", text: "Keep the app maintained")
-                ImpactRow(icon: "sparkles", text: "Inspire future development")
-                ImpactRow(icon: "cup.and.saucer.fill", text: "Buy me a coffee")
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-    }
-
-    // MARK: - Tip Options
-
-    private var tipOptionsSection: some View {
-        VStack(spacing: 12) {
-            ForEach(tippingManager.products, id: \.id) { product in
-                TipOptionCard(
-                    product: product,
-                    isSelected: selectedProduct?.id == product.id,
-                    isPurchasing: tippingManager.isPurchasing && selectedProduct?.id == product.id
-                ) {
-                    selectedProduct = product
-                    Task {
-                        let success = await tippingManager.purchase(product)
-                        purchaseSuccess = success
-                        if success {
-                            showThankYou = true
+            if tippingManager.isLoading {
+                ProgressView("Connecting to the App Store…")
+                    .padding()
+                    .accessibilityIdentifier("tipJar.loading")
+            } else if tippingManager.products.isEmpty {
+                Text("Tips are unavailable right now")
+                    .font(.headline)
+                    .accessibilityIdentifier("tipJar.unavailable")
+                Text(tippingManager.errorMessage ?? "Check your connection and try again. All app features remain free.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                retryButton
+            } else {
+                ForEach(tippingManager.products, id: \.id) { product in
+                    TipOptionCard(
+                        product: product,
+                        isPurchasing: tippingManager.isPurchasing && selectedProductID == product.id
+                    ) {
+                        selectedProductID = product.id
+                        Task {
+                            if await tippingManager.purchase(product) { showThankYou = true }
                         }
                     }
+                    .disabled(tippingManager.isPurchasing || tippingManager.isPending)
+                }
+                if let message = tippingManager.errorMessage {
+                    Text(message)
+                        .foregroundStyle(.red)
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("tipJar.error")
                 }
             }
         }
     }
 
-    // MARK: - Total Support
-
-    private var totalSupportSection: some View {
-        VStack(spacing: 8) {
-            Text("Your Total Donations")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text("$\(String(format: "%.2f", tippingManager.totalTipsAmount))")
-                .font(.title2.bold())
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-
-            Text("Thank you so much for your support! 💙")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private var retryButton: some View {
+        Button {
+            Task { await tippingManager.loadProducts() }
+        } label: {
+            Label("Try again", systemImage: "arrow.clockwise")
+                .frame(minHeight: 44)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
-    // MARK: - Styling
-
-    private var backgroundColor: some View {
-        #if os(macOS)
-            colorScheme == .dark
-                ? Color(nsColor: .windowBackgroundColor)
-                : Color(nsColor: .underPageBackgroundColor)
-        #else
-            colorScheme == .dark
-                ? Color(uiColor: .systemBackground)
-                : Color(uiColor: .systemGroupedBackground)
-        #endif
-    }
-
-    private var cardBackground: some View {
-        #if os(macOS)
-            colorScheme == .dark
-                ? Color(nsColor: .controlBackgroundColor)
-                : Color(nsColor: .windowBackgroundColor)
-        #else
-            colorScheme == .dark
-                ? Color(uiColor: .secondarySystemGroupedBackground)
-                : Color(uiColor: .systemBackground)
-        #endif
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("tipJar.retry")
     }
 }
 
-// MARK: - Supporting Views
-
 @available(iOS 15.0, macOS 12.0, *)
-struct TipOptionCard: View {
+private struct TipOptionCard: View {
     let product: Product
-    let isSelected: Bool
     let isPurchasing: Bool
     let onTap: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         Button(action: onTap) {
-            HStack {
+            HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(product.displayName)
                         .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    Text(product.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("One-time tip")
+                        .font(.subheadline)
                 }
-
-                Spacer()
-
+                Spacer(minLength: 8)
                 if isPurchasing {
                     ProgressView()
+                        .tint(.white)
                 } else {
                     Text(product.displayPrice)
                         .font(.title3.bold())
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue, .purple],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
                 }
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(cardBackgroundColor)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(
-                                LinearGradient(
-                                    colors: isSelected ? [.blue, .purple] : [.clear],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                lineWidth: 2
-                            )
-                    )
-            )
+            .padding(18)
+            .foregroundStyle(.white)
+            .background(Color.blue)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
-    }
-
-    private var cardBackgroundColor: Color {
-        #if os(macOS)
-            colorScheme == .dark
-                ? Color(nsColor: .controlBackgroundColor)
-                : Color(nsColor: .windowBackgroundColor)
-        #else
-            Color(uiColor: .secondarySystemGroupedBackground)
-        #endif
+        .accessibilityLabel("Send a one-time tip of \(product.displayPrice)")
+        .accessibilityValue(isPurchasing ? "Purchase in progress" : "")
+        .accessibilityIdentifier("tipJar.purchase")
     }
 }
 
@@ -311,23 +195,14 @@ struct ImpactRow: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .foregroundStyle(.blue)
-                .frame(width: 20)
-
+                .frame(width: 22)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.subheadline)
-                .foregroundStyle(.primary)
-
-            Spacer()
+                .fixedSize(horizontal: false, vertical: true)
         }
-    }
-}
-
-@available(iOS 15.0, macOS 12.0, *)
-struct TipJarView_Previews: PreviewProvider {
-    static var previews: some View {
-        TipJarView(tippingManager: TippingManager())
     }
 }

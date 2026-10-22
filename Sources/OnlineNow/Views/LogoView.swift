@@ -7,6 +7,7 @@ public struct LogoView: View {
     let size: CGFloat
     let isAnimating: Bool
     let isOnline: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var rotation: Double = 0
     @State private var pulseScale: CGFloat = 1.0
@@ -34,7 +35,7 @@ public struct LogoView: View {
                     )
                 )
                 .frame(width: size, height: size)
-                .scaleEffect(pulseScale)
+                .scaleEffect(reduceMotion ? 1 : pulseScale)
 
             // Outer ring
             Circle()
@@ -50,7 +51,7 @@ public struct LogoView: View {
                     style: StrokeStyle(lineWidth: size * 0.06, lineCap: .round)
                 )
                 .frame(width: size * 0.7, height: size * 0.7)
-                .rotationEffect(.degrees(isAnimating ? rotation : 0))
+                .rotationEffect(.degrees(isAnimating && !reduceMotion ? rotation : 0))
 
             // Ring gap with checkmark
             if isOnline && !isAnimating {
@@ -74,7 +75,7 @@ public struct LogoView: View {
                         )
                     )
                     .frame(width: size * 0.5, height: size * 0.5)
-                    .scaleEffect(pulseScale)
+                    .scaleEffect(reduceMotion ? 1 : pulseScale)
 
                 // Main dot
                 Circle()
@@ -92,6 +93,7 @@ public struct LogoView: View {
             }
         }
         .onAppear {
+            guard !reduceMotion else { return }
             if isAnimating {
                 withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
                     rotation = 360
@@ -127,6 +129,7 @@ struct CheckmarkBadge: View {
 @available(iOS 17.0, *)
 public struct LoadingRingView: View {
     let size: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var rotation: Double = 0
 
     public init(size: CGFloat = 200) {
@@ -152,7 +155,7 @@ public struct LoadingRingView: View {
                     style: StrokeStyle(lineWidth: size * 0.06, lineCap: .round)
                 )
                 .frame(width: size * 0.7, height: size * 0.7)
-                .rotationEffect(.degrees(rotation))
+                .rotationEffect(.degrees(reduceMotion ? 0 : rotation))
 
             // Center pulsing dot
             Circle()
@@ -160,6 +163,7 @@ public struct LoadingRingView: View {
                 .frame(width: size * 0.28, height: size * 0.28)
         }
         .onAppear {
+            guard !reduceMotion else { return }
             withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
                 rotation = 360
             }

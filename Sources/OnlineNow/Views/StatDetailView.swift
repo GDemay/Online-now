@@ -6,7 +6,7 @@ import Charts
 @available(iOS 17.0, macOS 14.0, *)
 public enum StatType: String, CaseIterable, Identifiable {
     case speed = "Speed"
-    case latency = "Latency"
+    case latency = "TCP Setup Estimate"
     case quality = "Quality"
     case connectionType = "Connection"
 
@@ -35,9 +35,9 @@ public enum StatType: String, CaseIterable, Identifiable {
         case .speed:
             return "Download speed measures how fast data can be downloaded to your device. Higher speeds mean faster loading times for websites, videos, and apps."
         case .latency:
-            return "Latency (ping) measures the time it takes for data to travel to a server and back. Lower latency means more responsive connections, important for video calls and gaming."
+            return "The TCP setup estimate times a connection to a public server. It includes connection setup and device scheduling, and is different from an ICMP ping. Lower values usually mean a more responsive connection."
         case .quality:
-            return "Signal quality is calculated based on your speed and latency. It gives an overall picture of your connection health."
+            return "Connection quality estimates performance from TCP latency and, when you run a speed test, download speed. It does not measure Wi-Fi or cellular radio signal strength."
         case .connectionType:
             return "Shows whether you're connected via WiFi, Cellular data, or Ethernet. WiFi typically offers faster speeds, while cellular provides mobility."
         }
@@ -47,17 +47,17 @@ public enum StatType: String, CaseIterable, Identifiable {
         switch self {
         case .speed:
             return [
-                ("Excellent", "> 50 Mbps"),
-                ("Good", "25-50 Mbps"),
-                ("Fair", "10-25 Mbps"),
+                ("Excellent", "50 Mbps or more"),
+                ("Good", "25 to under 50 Mbps"),
+                ("Fair", "10 to under 25 Mbps"),
                 ("Poor", "< 10 Mbps")
             ]
         case .latency:
             return [
                 ("Excellent", "< 20 ms"),
-                ("Good", "20-50 ms"),
-                ("Fair", "50-100 ms"),
-                ("Poor", "> 100 ms")
+                ("Good", "20 to under 50 ms"),
+                ("Fair", "50 to under 100 ms"),
+                ("Slow", "100 ms or more")
             ]
         case .quality:
             return [
@@ -79,7 +79,7 @@ public enum StatType: String, CaseIterable, Identifiable {
 
 /// Data point for charts
 struct ChartDataPoint: Identifiable {
-    let id = UUID()
+    let id: UUID
     let timestamp: Date
     let value: Double
 }
@@ -90,11 +90,10 @@ public struct StatDetailView: View {
     let statType: StatType
     let currentValue: String
     let unit: String
-    let historyManager: HistoryManager
+    @ObservedObject var historyManager: HistoryManager
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @State private var chartData: [ChartDataPoint] = []
 
     public init(statType: StatType, currentValue: String, unit: String, historyManager: HistoryManager) {
         self.statType = statType
@@ -136,9 +135,6 @@ public struct StatDetailView: View {
                     }
                 }
             }
-            .onAppear {
-                loadChartData()
-            }
         }
     }
 
@@ -152,7 +148,8 @@ public struct StatDetailView: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(currentValue)
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .font(.largeTitle.weight(.bold))
+                    .fixedSize(horizontal: false, vertical: true)
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.system(size: 20, weight: .medium))
@@ -160,7 +157,7 @@ public struct StatDetailView: View {
                 }
             }
 
-            Text("Current \(statType.rawValue)")
+            Text(statType == .speed ? "Last Measured Download Speed" : "Current \(statType.rawValue)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -191,9 +188,10 @@ public struct StatDetailView: View {
                 .font(.headline)
 
             if chartData.isEmpty {
-                Text("Not enough data yet")
+                Text(statType == .speed ? "Run Test Speed to start your speed history." : "Latency history appears after a successful connection check.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 40)
             } else {
@@ -203,14 +201,14 @@ public struct StatDetailView: View {
                         y: .value(statType.rawValue, point.value)
                     )
                     .foregroundStyle(statType.color.gradient)
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(.linear)
 
                     AreaMark(
                         x: .value("Time", point.timestamp),
                         y: .value(statType.rawValue, point.value)
                     )
                     .foregroundStyle(statType.color.opacity(0.1).gradient)
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(.linear)
 
                     PointMark(
                         x: .value("Time", point.timestamp),
@@ -227,6 +225,7 @@ public struct StatDetailView: View {
                     }
                 }
                 .frame(height: 200)
+                .accessibilityLabel("\(statType.rawValue) history")
             }
         }
         .padding()
@@ -314,7 +313,7 @@ public struct StatDetailView: View {
             ]
         case .quality:
             return [
-                "Quality combines both speed and latency metrics",
+                "Quality estimates performance, not wireless signal strength",
                 "Excellent quality is ideal for video calls",
                 "Fair quality should handle basic browsing",
                 "Poor quality may cause streaming issues"
@@ -324,27 +323,27 @@ public struct StatDetailView: View {
                 "WiFi is usually faster than cellular",
                 "5G cellular can match WiFi speeds",
                 "Switch to cellular if WiFi is unstable",
-                "Airplane mode disables all connections"
+                "Wi-Fi can be re-enabled while Airplane Mode is on"
             ]
         }
     }
 
-    private func loadChartData() {
-        let checks = historyManager.recentChecks
+    private var chartData: [ChartDataPoint] {
+        let checks = historyManager.recentChecks.prefix(20)
 
         switch statType {
         case .speed:
-            chartData = checks.compactMap { check in
-                guard let speed = check.speedMbps else { return nil }
-                return ChartDataPoint(timestamp: check.timestamp, value: speed)
-            }.reversed()
+            return checks.compactMap { check -> ChartDataPoint? in
+                guard let speed = check.speedMbps, speed.isFinite, speed >= 0 else { return nil }
+                return ChartDataPoint(id: check.id, timestamp: check.timestamp, value: speed)
+            }.sorted { $0.timestamp < $1.timestamp }
         case .latency:
-            chartData = checks.compactMap { check in
-                guard let latency = check.latencyMs else { return nil }
-                return ChartDataPoint(timestamp: check.timestamp, value: latency)
-            }.reversed()
+            return checks.compactMap { check -> ChartDataPoint? in
+                guard let latency = check.rttMs, latency.isFinite, latency >= 0 else { return nil }
+                return ChartDataPoint(id: check.id, timestamp: check.timestamp, value: latency)
+            }.sorted { $0.timestamp < $1.timestamp }
         default:
-            chartData = []
+            return []
         }
     }
 }

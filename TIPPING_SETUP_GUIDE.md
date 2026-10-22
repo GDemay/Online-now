@@ -1,232 +1,69 @@
-# Apple Pay Tipping Setup Guide
+# Optional tips: setup and verification
 
-This guide walks you through setting up Apple Pay tipping in App Store Connect for OnlineNow.
+Online Now uses StoreKit 2 in-app purchases for an optional, repeatable tip. Every app feature remains free. This is an App Store purchase, not an Apple Pay integration or a charitable donation.
 
-## 🎯 What's Implemented
+## Catalog and App Store Connect
 
-The app now includes:
-- ✅ **One donation option**: $1 donation
-- ✅ **Contextual prompts**: After first speed test, frequent use, etc.
-- ✅ **Beautiful UI**: Modern tip jar with gratitude messaging
-- ✅ **StoreKit 2**: Modern async/await implementation
-- ✅ **Local testing**: Configuration.storekit for Xcode testing
+The app and `Configuration.storekit` use one product:
 
----
+| Field | Value |
+| --- | --- |
+| Bundle identifier | `com.gdemay.onlinenow` |
+| Product identifier | `onlinenow.gdemay` |
+| Product type | Consumable |
+| Local test price | `0.99` in the local test configuration |
 
-## 📋 Step 1: Create In-App Purchase Products
+The live price and currency come from `Product.displayPrice`. The local test price does not set the live price. Do not rename the product identifier to fix an empty catalog without checking the actual App Store Connect product first.
 
-### 1.1 Access App Store Connect
+Before release, verify in App Store Connect that:
 
-1. Go to [App Store Connect](https://appstoreconnect.apple.com)
-2. Click **My Apps** → Select **Online Now**
-3. Click **In-App Purchases** in the left sidebar
-4. Click the **+** button to create a new in-app purchase
+- The product belongs to the exact app bundle and is available in the intended storefronts.
+- Its type is Consumable, its price and localization are complete, and its review screenshot is current.
+- The product is approved or submitted with the app as required by App Store Connect.
+- Paid Apps agreements, tax information, and banking requirements are current.
+- The app version includes the in-app purchase when submitting it for review.
 
-### 1.2 Create Donation Product
+These checks require App Store Connect access. Source inspection and local StoreKit tests cannot establish that the live catalog or payment account is ready.
 
-1. **Type**: Consumable
-2. **Reference Name**: `donation`
-3. **Product ID**: `onlinenow.gdemay`
-4. **Price**: Select **Tier 1** ($0.99 USD)
-5. **Localization** (English - U.S.):
-   - **Display Name**: `Donation`
-   - **Description**: `Support OnlineNow development with a donation.`
-6. **Review Information**:
-   - **Screenshot**: Take a screenshot of the tip jar (use preview mode)
-   - **Review Notes**: "Consumable donation to support app development. No content unlocked."
-7. Click **Save**
+## What the implementation does
 
-### 1.3 Submit Product for Review
+- Shows the App Store's localized product and price. An empty or failed catalog shows an explanation and a retry action.
+- Prevents simultaneous purchase attempts, verifies transactions, saves a transaction-ID ledger before finishing, and ignores repeated delivery of the same transaction.
+- Listens for delayed purchase approval and recovers unfinished transactions when the app starts.
+- Leaves an unverified transaction unfinished and shows a verification error.
+- Treats cancellation as cancellation, and pending approval as a pending status rather than a failure or a successful payment.
+- Records verified refund/revocation updates without allowing an older delivery to restore the refunded tip.
+- Counts tips rather than summing prices from different currencies into a misleading US dollar total.
+- Describes tips as gratitude and maintenance support. No custom icons, credits, beta access, or priority support are sold.
 
-1. Click **Submit for Review** on your donation product
-2. The product will be reviewed along with your app submission
+The ledger is local to this installation. Consumable tips are not restorable through `AppStore.sync()` after reinstalling the app. There is deliberately no Restore Purchases button. Refund updates delivered to the current installation are reflected locally; the ledger is not a server-side financial record.
 
----
+Ask to Buy requests can remain pending while approval happens outside the app. A declined request does not emit a completed transaction. If a request has been declined, reopen the app before trying another tip. Approval delivered later is still deduplicated by transaction ID.
 
-## 🧪 Step 2: Test Locally (Before App Store Submission)
+## Local testing in Xcode
 
-### 2.1 Use StoreKit Configuration File
+1. Use a Mac with the project's supported Xcode version and open `OnlineNow.xcodeproj`.
+2. Use the shared OnlineNow scheme. Its run/test setup uses `Configuration.storekit` for local testing; confirm the configuration in Scheme > Edit Scheme before running.
+3. Run the iOS simulator tests, including `TippingManagerTests` and `TippingStoreKitTests`.
+4. Launch the app, open the tip jar, confirm a single consumable with a localized price, purchase it twice, and confirm two tips are recorded.
+5. Use Xcode's StoreKit transaction controls to check cancellation, failure, pending Ask to Buy, approval, refund, and transaction redelivery.
+6. Terminate and reopen the app between purchase confirmation and fulfillment to check unfinished recovery.
+7. Check large text, VoiceOver labels, dark mode, and that Close remains available while a request is pending.
+8. Disable the local catalog and verify that an unavailable or unreachable App Store produces an explanation and retry action rather than a blank sheet.
 
-The app includes `Configuration.storekit` for local testing:
+The pure Foundation ledger tests cover duplicate delivery, repeat consumables, refunds, out-of-order refund delivery, and persistence. Apple tests exercise persisted manager state and the local StoreKit flow. Passing local tests does not prove live payments work.
 
-1. Open the project in Xcode
-2. Run the app in the simulator or on a device
-3. In Xcode menu: **Debug** → **StoreKit** → **Configuration File** → Select `Configuration.storekit`
-4. Tap the coffee cup icon in the app to open the tip jar
-5. Test purchasing the donation
-6. Verify the thank you message appears
+## Sandbox and TestFlight release check
 
-### 2.2 Test Sandbox Environment
+Use a development build with the local StoreKit configuration disabled, or a TestFlight build, to exercise the App Store Connect sandbox catalog. TestFlight purchases use the sandbox and do not charge real money.
 
-Before going live, test with sandbox accounts:
+Record device, iOS version, app build, storefront, product identifier, and observed outcome for:
 
-1. Go to [App Store Connect](https://appstoreconnect.apple.com)
-2. Click **Users and Access** → **Sandbox Testers**
-3. Create a new sandbox tester account
-4. Sign out of your Apple ID on your device (Settings → App Store)
-5. Run your app from Xcode
-6. When prompted to sign in, use your sandbox tester account
-7. Test all purchase flows
+- Product lookup with the expected localized price.
+- Successful purchase and repeat purchase.
+- User cancellation, interrupted purchase, and offline retry.
+- Ask to Buy/pending approval where available.
+- Approval after restarting the app and no duplicate credit.
+- Refund/revocation behavior supported by the test environment.
 
-**Important**: Never use your real Apple ID for testing purchases!
-
----
-
-## 📱 Step 3: Integrate with App Submission
-
-### 3.1 Update App Description
-
-Add this to your App Store description:
-
-```
-💙 SUPPORT THE DEVELOPER
-Love OnlineNow? Support development with an optional tip! Your generosity helps fund new features like ISP comparison, WiFi location ratings, and advanced analytics.
-
-Supporter Benefits:
-• $2+: Name in credits
-• $5+: Custom app icons
-• $10+: Beta feature access
-```
-
-### 3.2 Update App Review Notes
-
-Add this to your App Review Notes:
-
-```
-IN-APP PURCHASES:
-This app includes optional tipping functionality:
-- Three consumable tips: $2, $5, $10
-- Tips support ongoing development
-- No content is locked behind paywalls
-- Donation is pure gratitude, no benefits provided
-
-To test:
-1. Complete a speed test (tap the large logo)
-2. A tip prompt may appear after first speed test
-3. Tap coffee cup icon in top-left to access tip jar
-4. All features work without donating
-```
-
-### 3.3 Privacy Nutrition Label
-
-Update your privacy nutrition label in App Store Connect:
-
-1. Go to **App Privacy** section
-2. Add **Purchases** data type:
-   - **Purchase History**: Used for tracking supporter status
-   - **Linked to User**: Yes
-   - **Used for Tracking**: No
-
----
-
-## 🎨 Step 4: Take Screenshots for Review
-
-Apple requires screenshots of in-app purchases:
-
-### 4.1 Screenshot the Tip Jar
-
-1. Run the app in simulator (iPhone 15 Pro)
-2. Tap the coffee cup icon in top-left
-3. Take a screenshot (Cmd+S)
-4. Upload to the in-app purchase product
-
-### 4.2 Screenshot After Purchase
-
-1. Make a test purchase
-2. Screenshot the "Thank You" alert
-3. Keep for App Review if requested
-
----
-
-## ⚡ Step 5: Monitor Performance
-
-After launch, monitor tipping performance:
-
-### Track in App Store Connect
-
-1. **Sales and Trends** → Filter by **In-App Purchases**
-2. Monitor conversion rates
-3. Track total donations received
-
-### Track in Analytics (Optional Enhancement)
-
-Consider adding analytics to track:
-- How many users see tip prompts
-- Conversion rate per trigger (first speed test, frequent user, etc.)
-- Average tip amount per user
-- Supporter retention
-
----
-
-## 💡 Tips for Success
-
-### Maximize Donations
-
-1. **Timing is everything**: Prompts appear after positive moments (successful speed test)
-2. **Show value first**: Users see the app's value before being asked to donate
-3. **Make it optional**: Never block features behind donations
-4. **Show gratitude**: "Thanks for supporting OnlineNow development"
-
-### Future Enhancements
-
-Consider adding:
-- 🔜 Multiple donation tiers ($1, $5, $10)
-- 🔜 Custom app icons for supporters
-- 🔜 Name in credits section
-
-### Future Monetization
-
-Once tipping is established, consider:
-- Premium subscription ($4.99/month) for unlimited locations
-- ISP comparison as premium feature
-- WiFi location ratings for power users
-- Family monitoring dashboard
-
----
-
-## 🐛 Troubleshooting
-
-### "Products not found"
-- Ensure products are approved in App Store Connect
-- Wait 2-24 hours after creating products
-- Verify Bundle ID matches exactly
-- Check internet connection
-
-### "Cannot connect to iTunes Store"
-- Sign out of App Store on device
-- Sign in with sandbox tester account
-- Ensure StoreKit testing is enabled in scheme
-
-### "Purchase failed"
-- Check product IDs match exactly (case-sensitive)
-- Verify products are approved
-- Ensure app is signed with correct team
-- Check Xcode console for detailed error
-
----
-
-## 📞 Support
-
-If you encounter issues:
-1. Check Xcode console for error messages
-2. Verify all product IDs match exactly
-3. Ensure products are approved in App Store Connect
-4. Test with sandbox account first
-5. Contact Apple Developer Support if needed
-
----
-
-## ✅ Launch Checklist
-
-Before submitting to App Store:
-
-- [ ] Donation product created in App Store Connect (ID: onlinenow.gdemay)
-- [ ] Product submitted for review
-- [ ] Tested with Configuration.storekit locally
-- [ ] Tested with sandbox account
-- [ ] Screenshot taken for the product
-- [ ] App description mentions donations (optional)
-- [ ] Privacy nutrition label updated
-- [ ] App review notes include purchase testing instructions
-
-**You're ready to launch! 🚀**
+Do not report a payment release as ready until these live-catalog checks pass and the App Store Connect requirements above are confirmed. Never use a real customer's account or charge a real donation as an automated test.

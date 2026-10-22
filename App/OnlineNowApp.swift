@@ -3,30 +3,84 @@ import SwiftData
 
 @available(iOS 17.0, *)
 @main
+@MainActor
 struct OnlineNowApp: App {
+    @State private var storage = HistoryStorage.open()
 
-    /// SwiftData model container for connectivity history
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            ConnectivityCheck.self,
-        ])
-        let modelConfiguration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            allowsSave: true
-        )
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    private var isUnitTestHost: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--unit-testing")
+        #else
+        return false
+        #endif
+    }
 
     var body: some Scene {
         WindowGroup {
-            ConnectivityStatusView()
+            if isUnitTestHost {
+                // Hosted unit tests create their own services. A live app listener
+                // could otherwise finish StoreKit transactions before a test sees them.
+                Color.clear
+            } else if let container = storage.container {
+                ConnectivityStatusView()
+                    .modelContainer(container)
+                    .safeAreaInset(edge: .bottom) {
+                        if storage.isTemporary {
+                            VStack(spacing: 4) {
+                                Text("History is temporarily unavailable")
+                                    .font(.subheadline.bold())
+                                Text("Checks still work. New history lasts for this session; existing history has been kept.")
+                                    .font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(.regularMaterial)
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+            } else {
+                ContentUnavailableView {
+                    Label("Unable to open history", systemImage: "externaldrive.badge.exclamationmark")
+                } description: {
+                    Text("Your saved history has been kept. Try opening the app again.")
+                } actions: {
+                    Button("Try Again") { storage = HistoryStorage.open() }
+                        .buttonStyle(.borderedProminent)
+                }
+            }
         }
-        .modelContainer(sharedModelContainer)
+    }
+}
+
+@available(iOS 17.0, *)
+@MainActor
+private struct HistoryStorage {
+    let container: ModelContainer?
+    let isTemporary: Bool
+
+    static func open() -> HistoryStorage {
+        let schema = Schema([ConnectivityCheck.self])
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing")
+            || ProcessInfo.processInfo.arguments.contains("--unit-testing") {
+            return HistoryStorage(
+                container: try? ModelContainer(for: schema, configurations: [
+                    ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                ]), isTemporary: false
+            )
+        }
+        #endif
+        do {
+            let container = try ModelContainer(for: schema, configurations: [
+                ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            ])
+            return HistoryStorage(container: container, isTemporary: false)
+        } catch {
+            // Never erase an unreadable user store. Keep checking the connection using session-only history.
+            let temporary = try? ModelContainer(for: schema, configurations: [
+                ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            ])
+            return HistoryStorage(container: temporary, isTemporary: true)
+        }
     }
 }

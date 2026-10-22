@@ -22,8 +22,15 @@ public actor DiagnosticService {
     /// - Parameter host: Host to ping (default: 1.1.1.1)
     /// - Returns: DiagnosticResult comparing app vs system measurements
     public func validateLatency(host: String = "1.1.1.1") async -> DiagnosticResult {
-        // Measure with app
-        let appResult = await latencyService.measureAverageLatency(samples: 3)
+        // Compare the same endpoint. Previously `host` was ignored by the app
+        // measurement, making the displayed comparison meaningless.
+        guard let endpoint = LatencyMeasurementService.LatencyEndpoint(rawValue: host) else {
+            return DiagnosticResult(testType: .latency, appMeasurement: "Failed",
+                systemMeasurement: "Not measured", difference: nil, appMethod: "TCP",
+                systemMethod: "N/A", details: ["Error": "Choose a supported diagnostic endpoint"],
+                isValid: false)
+        }
+        let appResult = await latencyService.measureTCPLatency(to: endpoint)
         
         #if os(macOS)
         // Measure with system ping
@@ -58,7 +65,7 @@ public actor DiagnosticService {
                 "App Error": appResult.error ?? "None",
                 "Note": "System ping requires macOS"
             ],
-            isValid: true  // Can't validate without system tool
+            isValid: appResult.rttMs != nil  // A failed probe is never a valid result.
         )
         #endif
     }
@@ -71,11 +78,13 @@ public actor DiagnosticService {
         // Test latency against multiple endpoints
         let endpoints = ["1.1.1.1", "8.8.8.8", "www.google.com"]
         for endpoint in endpoints {
+            guard !Task.isCancelled else { return results }
             let result = await validateLatency(host: endpoint)
             results.append(result)
         }
         
         // Test speed measurement
+        guard !Task.isCancelled else { return results }
         let speedDiagnostic = await validateSpeedTest()
         results.append(speedDiagnostic)
         
@@ -128,14 +137,16 @@ public actor DiagnosticService {
     // MARK: - Private Helpers
     
     private func calculateDifference(app: Double?, system: Double?) -> String? {
-        guard let app = app, let system = system else { return nil }
+        guard let app = app, let system = system, app.isFinite,
+              system.isFinite, app >= 0, system > 0 else { return nil }
         let diff = abs(app - system)
         let percentDiff = (diff / system) * 100
         return String(format: "%.1f ms (%.0f%%)", diff, percentDiff)
     }
     
     private func isLatencyValid(app: Double?, system: Double?) -> Bool {
-        guard let app = app, let system = system else { return false }
+        guard let app = app, let system = system, app.isFinite,
+              system.isFinite, app >= 0, system > 0 else { return false }
         let percentDiff = abs(app - system) / system * 100
         // Consider valid if within 30% (TCP vs ICMP have different characteristics)
         return percentDiff < 30
@@ -152,7 +163,8 @@ public actor DiagnosticService {
         let pipe = Pipe()
         
         process.executableURL = URL(fileURLWithPath: "/sbin/ping")
-        process.arguments = ["-c", "\(count)", host]
+        // Bound the entire command, including an unreachable host.
+        process.arguments = ["-c", "\(min(10, max(1, count)))", "-t", "5", host]
         process.standardOutput = pipe
         process.standardError = pipe
         
@@ -224,10 +236,9 @@ public struct DiagnosticResult: Sendable {
     
     /// Status emoji for quick visual feedback
     public var statusEmoji: String {
-        if systemMeasurement.contains("Not available") {
-            return "ℹ️"
-        }
-        return isValid ? "✅" : "⚠️"
+        guard isValid else { return "⚠️" }
+        if systemMeasurement.contains("Not available") { return "ℹ️" }
+        return "✅"
     }
     
     /// Formatted summary string

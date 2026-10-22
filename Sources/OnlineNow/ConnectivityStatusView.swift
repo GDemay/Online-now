@@ -1,18 +1,19 @@
 import SwiftData
 import SwiftUI
 
-/// Premium main view with top-tier iOS design
-/// Displays current network connectivity status with all features
+/// Displays current network connectivity and user-initiated measurements.
 /// Note: Requires iOS 17+ for SwiftData integration. For iOS 15+ use ConnectivityBanner.
 @available(iOS 17.0, macOS 14.0, *)
 public struct ConnectivityStatusView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var viewModel = ConnectivityViewModel()
     @State private var showHistory = false
     @State private var showTipJar = false
     @State private var selectedStatType: StatType?
-    @Namespace private var animation
+    @State private var actionTask: Task<Void, Never>?
 
     public init() {}
 
@@ -26,6 +27,8 @@ public struct ConnectivityStatusView: View {
 
                         // Main content
                         VStack(spacing: 20) {
+                            measurementActions
+
                             // Real-time stats cards row (always visible, tappable)
                             statsCardsRow
 
@@ -37,11 +40,14 @@ public struct ConnectivityStatusView: View {
                                 recentActivityCard(lastCheck)
                             }
 
-                            Spacer(minLength: 100)
+                            Spacer(minLength: 24)
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 24)
                     }
+                }
+                .refreshable {
+                    await viewModel.quickCheck()
                 }
                 .background(backgroundView)
             }
@@ -54,10 +60,11 @@ public struct ConnectivityStatusView: View {
                         Image(systemName: "cup.and.saucer.fill")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.primary)
-                            .frame(height: 36)
+                            .frame(minWidth: 44, minHeight: 44)
                             .padding(.horizontal, 12)
                             .background(.ultraThinMaterial, in: Capsule())
                     }
+                    .accessibilityIdentifier("navigation.tipJar")
                     .accessibilityLabel("Support developer")
                 }
 
@@ -66,16 +73,19 @@ public struct ConnectivityStatusView: View {
                         showHistory = true
                     } label: {
                         Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.body.weight(.semibold))
                             .foregroundStyle(.primary)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 44, height: 44)
                             .background(.ultraThinMaterial, in: Circle())
                     }
                     .accessibilityLabel("View history")
+                    .accessibilityIdentifier("navigation.history")
                 }
             }
             .sheet(isPresented: $showHistory) {
-                HistoryListView(historyManager: viewModel.historyManager)
+                HistoryListView(historyManager: viewModel.historyManager) {
+                    viewModel.tippingManager.recordHistoryExported()
+                }
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
@@ -94,12 +104,24 @@ public struct ConnectivityStatusView: View {
             }
             .onAppear {
                 viewModel.historyManager.configure(with: modelContext)
-                viewModel.startMonitoring()
+                if scenePhase == .active {
+                    viewModel.startMonitoring()
+                }
             }
             .onDisappear {
+                actionTask?.cancel()
                 viewModel.stopMonitoring()
             }
-            // Preview mode: triple-tap anywhere to toggle, tap to cycle states
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    viewModel.startMonitoring()
+                } else {
+                    actionTask?.cancel()
+                    viewModel.stopMonitoring()
+                }
+            }
+            // Screenshot values must never replace real measurements in a release build.
+            #if DEBUG
             .onTapGesture(count: 3) {
                 withAnimation(.spring(response: 0.3)) {
                     viewModel.togglePreviewMode()
@@ -112,6 +134,7 @@ public struct ConnectivityStatusView: View {
                     }
                 }
             }
+            #endif
             .overlay(alignment: .top) {
                 // Preview mode indicator
                 if viewModel.isPreviewMode {
@@ -162,6 +185,61 @@ public struct ConnectivityStatusView: View {
 
     // MARK: - Stat Value Helpers
 
+    private var isBusy: Bool {
+        viewModel.isPerformingCheck || viewModel.isPerformingSpeedTest
+    }
+
+    private var measurementActions: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 12) { refreshButton; speedTestButton }
+            } else {
+                HStack(spacing: 12) { refreshButton; speedTestButton }
+            }
+            Text("Speed tests download data and use your current Wi-Fi or mobile plan. They run only when you choose Test Speed.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let error = viewModel.errorMessage {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("measurementError")
+            }
+        }
+    }
+
+    private var refreshButton: some View {
+        Button {
+            actionTask = Task { await viewModel.quickCheck() }
+        } label: {
+            Label("Refresh", systemImage: "arrow.clockwise")
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.bordered)
+        .disabled(isBusy || viewModel.isPreviewMode)
+        .accessibilityIdentifier("connectivity.refresh")
+        .accessibilityHint("Checks internet access without running a speed test")
+    }
+
+    private var speedTestButton: some View {
+        Button {
+            actionTask = Task { await viewModel.fullCheck() }
+        } label: {
+            HStack {
+                if viewModel.isPerformingSpeedTest { ProgressView().tint(.white) }
+                Label(viewModel.isPerformingSpeedTest ? "Testing…" : "Test Speed", systemImage: "speedometer")
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(isBusy || !viewModel.isConnected || viewModel.isPreviewMode)
+        .accessibilityIdentifier("connectivity.speedTest")
+        .accessibilityHint("Downloads test data to measure your connection speed")
+    }
+
     private func currentValueFor(_ statType: StatType) -> String {
         switch statType {
         case .speed:
@@ -170,7 +248,7 @@ public struct ConnectivityStatusView: View {
             }
             return "—"
         case .latency:
-            // Use real network RTT (TCP latency), not HTTP response time
+            // TCP setup timing is kept separate from full HTTP response time.
             if let rtt = viewModel.rttMs {
                 return String(format: "%.0f", rtt)
             }
@@ -231,33 +309,33 @@ public struct ConnectivityStatusView: View {
                 if viewModel.state == .checking || viewModel.state == .measuringSpeed
                     || viewModel.state == .idle
                 {
-                    LoadingRingView(size: min(geometry.size.width * 0.65, 280))
+                    LoadingRingView(size: min(geometry.size.width * 0.5, 200))
                 } else {
                     LogoView(
-                        size: min(geometry.size.width * 0.65, 280),
+                        size: min(geometry.size.width * 0.5, 200),
                         isAnimating: false,
                         isOnline: viewModel.state == .online
                     )
                 }
             }
-            .frame(height: min(geometry.size.width * 0.65, 280))
+            .frame(height: min(geometry.size.width * 0.5, 200))
             .accessibilityHidden(true)
 
             // App title
             Text("Online Now")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .font(.system(.title2, design: .rounded, weight: .bold))
                 .foregroundStyle(.primary)
 
             // Status text
             VStack(spacing: 8) {
                 Text(statusTitle)
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
                     .foregroundStyle(statusTitleColor)
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.4), value: viewModel.state)
 
                 Text(statusSubtitle)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -277,7 +355,7 @@ public struct ConnectivityStatusView: View {
         case .offline: return "You're Offline"
         case .limitedConnectivity: return "Limited Access"
         case .measuringSpeed: return "Testing Speed..."
-        case .error(let msg): return msg
+        case .error: return "Couldn't Check Connection"
         }
     }
 
@@ -287,7 +365,7 @@ public struct ConnectivityStatusView: View {
         case .online:
             var subtitle = "Connected via \(viewModel.connectionType.displayName)"
             if viewModel.isVPNActive {
-                subtitle += " • VPN Active"
+                subtitle += " • Possible VPN"
             }
             if let lastCheck = viewModel.lastCheckTime {
                 let formatter = RelativeDateTimeFormatter()
@@ -300,7 +378,7 @@ public struct ConnectivityStatusView: View {
         case .limitedConnectivity: return "Network connected but internet unreachable"
         case .measuringSpeed: return "Downloading test data..."
         case .idle: return "Initializing real-time monitoring..."
-        default: return "Monitoring your connection"
+        case .error(let message): return message
         }
     }
 
@@ -321,43 +399,38 @@ public struct ConnectivityStatusView: View {
     // MARK: - Stats Cards
 
     private var statsCardsRow: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 12) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2), spacing: 12) {
+                Button { selectedStatType = .speed } label: {
                 // Speed card - tappable
                 MiniStatCard(
-                    title: "Speed",
-                    value: viewModel.speedResult?.speedMbps != nil
-                        ? String(
-                            format: viewModel.speedResult!.speedMbps! < 10 ? "%.1f" : "%.0f",
-                            viewModel.speedResult!.speedMbps!) : "—",
+                    title: "Last Download Speed",
+                    value: currentValueFor(.speed),
                     unit: viewModel.speedResult?.speedMbps != nil ? "Mbps" : "",
                     icon: "arrow.down.circle.fill",
-                    color: viewModel.speedResult?.speedMbps != nil
-                        ? speedColor(viewModel.speedResult!.speedMbps!) : .gray,
+                    color: (viewModel.speedResult?.speedMbps).map(speedColor) ?? .gray,
                     showChevron: true
                 )
-                .onTapGesture {
-                    selectedStatType = .speed
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("connectivity.speed")
+                .accessibilityLabel("Download speed, \(currentValueFor(.speed)) megabits per second")
+                .accessibilityHint("View speed details and history")
 
-                // Latency card - tappable (shows real network RTT)
-                MiniStatCard(
-                    title: "Latency",
-                    value: viewModel.rttMs != nil
-                        ? String(format: "%.0f", viewModel.rttMs!) : "—",
+                // TCP setup timing includes connection setup and local scheduling.
+                Button { selectedStatType = .latency } label: { MiniStatCard(
+                    title: "TCP Setup Estimate",
+                    value: currentValueFor(.latency),
                     unit: viewModel.rttMs != nil ? "ms" : "",
                     icon: "timer",
-                    color: viewModel.rttMs != nil ? latencyColor(viewModel.rttMs!) : .gray,
+                    color: viewModel.rttMs.map(latencyColor) ?? .gray,
                     showChevron: true
                 )
-                .onTapGesture {
-                    selectedStatType = .latency
                 }
-            }
+                .buttonStyle(.plain)
+                .accessibilityLabel("TCP setup estimate, \(currentValueFor(.latency)) milliseconds")
 
-            HStack(spacing: 12) {
                 // Quality card - tappable
-                MiniStatCard(
+                Button { selectedStatType = .quality } label: { MiniStatCard(
                     title: "Quality",
                     value: viewModel.signalQuality,
                     unit: "",
@@ -365,12 +438,12 @@ public struct ConnectivityStatusView: View {
                     color: qualityColor,
                     showChevron: true
                 )
-                .onTapGesture {
-                    selectedStatType = .quality
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Connection quality, \(viewModel.signalQuality)")
 
                 // Connection type card - tappable
-                MiniStatCard(
+                Button { selectedStatType = .connectionType } label: { MiniStatCard(
                     title: "Type",
                     value: viewModel.connectionType.displayName,
                     unit: "",
@@ -378,18 +451,17 @@ public struct ConnectivityStatusView: View {
                     color: viewModel.isConnected ? .blue : .gray,
                     showChevron: true
                 )
-                .onTapGesture {
-                    selectedStatType = .connectionType
                 }
-            }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Connection type, \(viewModel.connectionType.displayName)")
         }
     }
 
     private func speedColor(_ speed: Double) -> Color {
         switch speed {
-        case 0..<5: return .red
-        case 5..<25: return .orange
-        case 25..<100: return .green
+        case 0..<10: return .red
+        case 10..<25: return .orange
+        case 25..<50: return .green
         default: return .blue
         }
     }
@@ -400,10 +472,6 @@ public struct ConnectivityStatusView: View {
         case 50..<100: return .orange
         default: return .red
         }
-    }
-
-    private var connectionQuality: String {
-        return viewModel.signalQuality
     }
 
     private var qualityColor: Color {
@@ -419,15 +487,16 @@ public struct ConnectivityStatusView: View {
     // MARK: - Recent Activity Card
 
     private func recentActivityCard(_ check: ConnectivityCheck) -> some View {
+        Button { showHistory = true } label: {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Label("Recent Activity", systemImage: "clock")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
                 if let timeAgo = viewModel.historyManager.timeSinceLastCheck() {
                     Text(timeAgo)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.footnote.weight(.medium))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -451,26 +520,26 @@ public struct ConnectivityStatusView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(check.isReachable ? "Connection Verified" : "Connection Failed")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.body.weight(.semibold))
 
                     HStack(spacing: 8) {
                         Text(check.connectionType)
-                            .font(.system(size: 13))
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
 
                         if let speed = check.speedMbps {
                             Text("•")
                                 .foregroundStyle(.tertiary)
                             Text(String(format: "%.1f Mbps", speed))
-                                .font(.system(size: 13))
+                                .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
 
                         if check.isVPNActive {
                             Text("•")
                                 .foregroundStyle(.tertiary)
-                            Label("VPN", systemImage: "lock.shield.fill")
-                                .font(.system(size: 13))
+                            Label("Possible VPN", systemImage: "lock.shield.fill")
+                                .font(.footnote)
                                 .foregroundStyle(.blue)
                         }
                     }
@@ -486,12 +555,11 @@ public struct ConnectivityStatusView: View {
         .padding(20)
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .onTapGesture {
-            showHistory = true
         }
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Recent activity: \(check.isReachable ? "Online" : "Offline"), \(viewModel.historyManager.timeSinceLastCheck() ?? "")"
+            "Recent activity: \(check.isReachable ? "Online" : (check.isConnected ? "Limited connectivity" : "Offline")), \(viewModel.historyManager.timeSinceLastCheck() ?? "")"
         )
         .accessibilityHint("Tap to view full history")
     }
@@ -501,7 +569,7 @@ public struct ConnectivityStatusView: View {
     private var networkInfoCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("Network Details", systemImage: "info.circle")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 12) {
@@ -525,34 +593,53 @@ public struct ConnectivityStatusView: View {
                 NetworkInfoRow(
                     icon: "g.circle.fill",
                     label: "Google",
-                    value: viewModel.isGoogleReachable ? "Reachable" : "Not Reachable",
-                    valueColor: viewModel.isGoogleReachable ? .green : .red
+                    value: endpointStatus(viewModel.isGoogleReachable),
+                    valueColor: viewModel.isGoogleReachable ? .green : .secondary
                 )
 
                 Divider()
 
                 NetworkInfoRow(
                     icon: "server.rack",
-                    label: "Cloudflare DNS",
-                    value: viewModel.isCloudflareReachable ? "Reachable" : "Not Reachable",
-                    valueColor: viewModel.isCloudflareReachable ? .green : .red
+                    label: "Cloudflare HTTPS",
+                    value: endpointStatus(viewModel.isCloudflareReachable),
+                    valueColor: viewModel.isCloudflareReachable ? .green : .secondary
                 )
 
                 Divider()
 
                 NetworkInfoRow(
                     icon: "waveform.path.ecg",
-                    label: "Signal Quality",
+                    label: "Connection Quality",
                     value: viewModel.signalQuality,
                     valueColor: qualityColor
                 )
+
+                if viewModel.isConstrained || viewModel.isExpensive {
+                    Divider()
+                    NetworkInfoRow(
+                        icon: "antenna.radiowaves.left.and.right",
+                        label: "Data Usage",
+                        value: viewModel.isConstrained ? "Low Data Mode" : "Metered connection",
+                        valueColor: .orange
+                    )
+                }
+
+                if let responseTime = viewModel.responseTimeMs {
+                    Divider()
+                    NetworkInfoRow(
+                        icon: "network",
+                        label: "HTTP Response Time",
+                        value: String(format: "%.0f ms", responseTime)
+                    )
+                }
 
                 if viewModel.isVPNActive {
                     Divider()
                     NetworkInfoRow(
                         icon: "lock.shield.fill",
-                        label: "VPN Status",
-                        value: "Active",
+                        label: "VPN Detection",
+                        value: "Tunnel detected",
                         valueColor: .blue
                     )
                 }
@@ -579,6 +666,12 @@ public struct ConnectivityStatusView: View {
         return formatter.string(from: date)
     }
 
+    private func endpointStatus(_ reachable: Bool) -> String {
+        if viewModel.isPerformingCheck { return "Checking…" }
+        if viewModel.lastCheckTime == nil { return "Not checked" }
+        return reachable ? "Reachable" : "No response"
+    }
+
     private var connectionTypeIcon: String {
         switch viewModel.connectionType {
         case .wifi: return "wifi"
@@ -603,53 +696,6 @@ public struct ConnectivityStatusView: View {
 // MARK: - Supporting Views
 
 @available(iOS 17.0, *)
-struct ActionButton: View {
-    let title: String
-    let icon: String
-    let color: Color
-    let isLoading: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
-                }
-                Text(title)
-                    .font(.system(size: 16, weight: .semibold))
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(
-                LinearGradient(
-                    colors: [color, color.opacity(0.8)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: color.opacity(0.3), radius: 8, x: 0, y: 4)
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-}
-
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.spring(response: 0.3), value: configuration.isPressed)
-    }
-}
-
-@available(iOS 17.0, *)
 struct MiniStatCard: View {
     let title: String
     let value: String
@@ -671,26 +717,26 @@ struct MiniStatCard: View {
 
                 if showChevron {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.tertiary)
                 }
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .font(.system(.title2, design: .rounded, weight: .bold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 if !unit.isEmpty {
                     Text(unit)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
             }
 
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -743,7 +789,7 @@ struct PreviewModeBanner: View {
             // Current state indicator
             Button(action: onCycleState) {
                 Text(stateLabel)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(.white.opacity(0.2), in: Capsule())
@@ -773,24 +819,32 @@ struct NetworkInfoRow: View {
     let label: String
     let value: String
     var valueColor: Color = .primary
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 8))
+        layout {
+            HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
                 .frame(width: 24)
 
             Text(label)
-                .font(.system(size: 15))
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
+            }
 
-            Spacer()
+            if !dynamicTypeSize.isAccessibilitySize { Spacer() }
 
             Text(value)
-                .font(.system(size: 15, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(valueColor)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 

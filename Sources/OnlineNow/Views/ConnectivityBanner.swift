@@ -186,22 +186,26 @@ final class ConnectivityBannerViewModel: ObservableObject {
     @Published var isVisible: Bool = false
 
     private var cancellables = Set<AnyCancellable>()
-    private var previousStatus: ConnectivityStatus = .checking
     private let configuration: ConnectivityBannerConfiguration
     private let reachabilityService = ReachabilityService()
     private var monitoringTask: Task<Void, Never>?
+    private var dismissTask: Task<Void, Never>?
 
     init(configuration: ConnectivityBannerConfiguration) {
         self.configuration = configuration
     }
 
     func startMonitoring() {
+        guard monitoringTask == nil else { return }
+        status = .checking
+        updateVisibility()
         monitoringTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self = self else { break }
 
                 // Check connectivity
                 let (reachability, captivePortal) = await self.reachabilityService.checkConnectivity()
+                guard !Task.isCancelled else { return }
 
                 let newStatus: ConnectivityStatus
                 if captivePortal.isCaptivePortal {
@@ -212,13 +216,11 @@ final class ConnectivityBannerViewModel: ObservableObject {
                     newStatus = .disconnected
                 }
 
-                // Update on main thread
-                await MainActor.run {
-                    self.updateStatus(newStatus, latency: reachability.latencyMs)
-                }
+                self.updateStatus(newStatus, latency: reachability.latencyMs)
 
                 // Check every 5 seconds
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                do { try await Task.sleep(nanoseconds: 5_000_000_000) }
+                catch { return }
             }
         }
     }
@@ -226,15 +228,19 @@ final class ConnectivityBannerViewModel: ObservableObject {
     func stopMonitoring() {
         monitoringTask?.cancel()
         monitoringTask = nil
+        dismissTask?.cancel()
+        dismissTask = nil
     }
 
-    private func updateStatus(_ newStatus: ConnectivityStatus, latency: Double) {
-        let wasConnected = previousStatus == .connected
+    // Internal to allow deterministic transition and cancellation regression tests.
+    func updateStatus(_ newStatus: ConnectivityStatus, latency: Double) {
+        let oldStatus = status
+        let wasConnected = oldStatus == .connected
         let isNowConnected = newStatus == .connected
 
         // Trigger haptic feedback on state changes
         #if os(iOS)
-        if configuration.hapticFeedback && previousStatus != newStatus {
+        if configuration.hapticFeedback && oldStatus != .checking && oldStatus != newStatus {
             if wasConnected && !isNowConnected {
                 HapticFeedbackManager.shared.connectionDropped()
             } else if !wasConnected && isNowConnected {
@@ -245,28 +251,32 @@ final class ConnectivityBannerViewModel: ObservableObject {
         }
         #endif
 
-        previousStatus = status
         status = newStatus
-        metadata = NetworkMetadata(latencyMs: latency, signalQuality: .unknown)
+        metadata = NetworkMetadata(latencyMs: newStatus == .connected && latency.isFinite && latency >= 0 ? latency : nil, signalQuality: .unknown)
 
         // Update visibility based on configuration
-        updateVisibility()
+        if oldStatus != newStatus { updateVisibility() }
     }
 
     private func updateVisibility() {
+        dismissTask?.cancel()
+        dismissTask = nil
         switch configuration.displayMode {
         case .disconnectedOnly:
             isVisible = status == .disconnected
         case .problemsOnly:
-            isVisible = status == .disconnected || status == .captivePortal
+            isVisible = status == .disconnected || status == .captivePortal || status == .localOnly
         case .always:
             isVisible = true
         }
 
         // Handle auto-dismiss
-        if isVisible, let delay = configuration.autoDismissDelay, status == .connected {
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        if isVisible, let delay = configuration.autoDismissDelay,
+           delay.isFinite, delay >= 0, status == .connected {
+            dismissTask = Task { [weak self] in
+                do { try await Task.sleep(nanoseconds: UInt64(min(delay, 86_400) * 1_000_000_000)) }
+                catch { return }
+                guard let self, !Task.isCancelled else { return }
                 if self.status == .connected {
                     self.isVisible = false
                 }
@@ -297,7 +307,8 @@ struct ConnectivityBannerView: View {
 
             statusText
 
-            if configuration.showLatency, let latency = viewModel.metadata.latencyMs {
+            if configuration.showLatency, let latency = viewModel.metadata.latencyMs,
+               latency.isFinite, latency >= 0, latency < Double(Int.max) {
                 Text("(\(Int(latency))ms)")
                     .font(.caption)
                     .opacity(0.8)
@@ -309,6 +320,7 @@ struct ConnectivityBannerView: View {
         .padding(.vertical, 10)
         .background(backgroundColor)
         .foregroundColor(foregroundColor)
+        .accessibilityElement(children: .combine)
     }
 
     private var statusIcon: some View {
@@ -393,7 +405,7 @@ struct ConnectivityBannerView: View {
             }
         }
 
-        return Color.white
+        return viewModel.status == .localOnly ? Color.black : Color.white
     }
 
     private var bannerTransition: AnyTransition {
@@ -416,6 +428,7 @@ struct ConnectivityBannerView: View {
 
 @available(iOS 15.0, macOS 12.0, *)
 struct ConnectivityBannerModifier: ViewModifier {
+    @Environment(\.scenePhase) private var scenePhase
     let configuration: ConnectivityBannerConfiguration
     @StateObject private var viewModel: ConnectivityBannerViewModel
 
@@ -440,10 +453,14 @@ struct ConnectivityBannerModifier: ViewModifier {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: viewModel.isVisible)
         }
         .onAppear {
-            viewModel.startMonitoring()
+            if scenePhase == .active { viewModel.startMonitoring() }
         }
         .onDisappear {
             viewModel.stopMonitoring()
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active { viewModel.startMonitoring() }
+            else { viewModel.stopMonitoring() }
         }
     }
 }

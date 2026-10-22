@@ -1,361 +1,188 @@
-# 🚀 First-Time App Store Publishing Guide
+# Online Now 1.2.0 release runbook
 
-This guide walks you through every step to publish Online Now on the Apple App Store for the first time.
+This updates the existing app; do not create another App Store Connect app or change its bundle identifier.
 
----
+| Item | Expected value |
+| --- | --- |
+| App Store Connect app ID | `6758242393` |
+| Bundle identifier | `com.gdemay.onlinenow` |
+| Production developer team | `GB87Z9SKC5` |
+| Current published version | `1.1` — recheck before staging |
+| Candidate version | `1.2.0` |
+| Candidate source branch | `fix/ios-audit-1.2.0`, merged to `main` for the existing automatic workflow |
+| Consumable tip product ID | `onlinenow.gdemay` |
 
-## 📋 What You'll Need
+Commands below were checked against `asc 5.16.0` help. The CLI's maintained upstream is [rorkai/App-Store-Connect-CLI](https://github.com/rorkai/App-Store-Connect-CLI), which the former `rudrankriyam` repository redirects to. The checksum-verified Linux executable in this workspace is `/workspace/scratch/bin/asc`.
 
-Before you start, make sure you have:
+## 1. Configure the smallest sufficient API access
 
-- [ ] **Apple Developer Account** ($99/year) - [Enroll here](https://developer.apple.com/programs/enroll/)
-- [ ] **Mac with Xcode 15+** installed
-- [ ] **Physical iOS device** for testing (recommended)
-- [ ] **App icon** (1024x1024 PNG) ✅ Already included
-- [ ] **Screenshots** for App Store (see sizes below)
+Use an App Store Connect **team API key with the App Manager role** for the existing production account. Supply its Key ID, Issuer ID, and `.p8` private-key file through the environment's credential/file mechanism. The Issuer ID is a UUID; **it is not** developer Team ID `GB87Z9SKC5`.
 
----
+App Manager can use Xcode Cloud, create versions, manage app metadata, and submit the app and its in-app purchase for review. Developer alone cannot complete this release: Apple's role table gives it read-only Xcode Cloud access and no app-version creation or app submission. Admin is unnecessary for an already configured signing/build pipeline. A team key covers all the account's apps and cannot be limited to only this app.
 
-## Step 1: Verify Your Apple Developer Account
+An individual key is an alternative when its user has App Manager access to this app. It uses `ASC_KEY_TYPE=individual`, Key ID, and `.p8`, with no Issuer ID; it cannot use provisioning endpoints. Prefer the team-key route here if certificate/profile work might be needed.
 
-1. Go to [developer.apple.com](https://developer.apple.com)
-2. Sign in with your Apple ID
-3. If not enrolled, click **Enroll** and follow the process
-4. Wait for approval (usually 24-48 hours for individuals)
+The CLI accepts these environment bindings; let the credential mechanism populate their values:
 
-Once approved, you'll have access to:
-- App Store Connect
-- Certificates, Identifiers & Profiles
-- Developer documentation
-
----
-
-## Step 2: Create App ID & Certificates
-
-### 2.1 Create an App ID
-
-1. Go to [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list)
-2. Click **Identifiers** → **+** button
-3. Select **App IDs** → Continue
-4. Select **App** → Continue
-5. Fill in:
-   - **Description**: `Online Now`
-   - **Bundle ID**: Select **Explicit** and enter `com.gdemay.onlinenow`
-6. Scroll down - no capabilities needed for this app
-7. Click **Continue** → **Register**
-
-### 2.2 Create Distribution Certificate (if you don't have one)
-
-1. Go to **Certificates** → **+** button
-2. Select **Apple Distribution** → Continue
-3. Follow the instructions to create a Certificate Signing Request (CSR)
-4. Upload the CSR and download the certificate
-5. Double-click to install in Keychain
-
----
-
-## Step 3: Enable GitHub Pages for Privacy Policy
-
-Your privacy policy and support pages are ready in the `docs/` folder. Enable GitHub Pages:
-
-1. Push your changes to GitHub:
-   ```bash
-   git add .
-   git commit -m "Add App Store submission files"
-   git push origin main
-   ```
-
-2. Go to [github.com/GDemay/Online-now](https://github.com/GDemay/Online-now)
-
-3. Click **Settings** (top menu) → **Pages** (left sidebar)
-
-4. Under **Source**:
-   - Select **Deploy from a branch**
-   - Branch: **main**
-   - Folder: **/docs**
-
-5. Click **Save**
-
-6. Wait 1-2 minutes, then verify:
-   - https://gdemay.github.io/Online-now/ (landing page)
-   - https://gdemay.github.io/Online-now/privacy.html (privacy policy)
-   - https://gdemay.github.io/Online-now/support.html (support page)
-
----
-
-## Step 4: Create App Store Connect Record
-
-1. Go to [App Store Connect](https://appstoreconnect.apple.com)
-2. Click **Apps** → **+** → **New App**
-3. Fill in the form:
-
-   | Field | Value |
-   |-------|-------|
-   | Platforms | iOS |
-   | Name | Online Now |
-   | Primary Language | English (U.S.) |
-   | Bundle ID | com.gdemay.onlinenow |
-   | SKU | onlinenow-ios-001 |
-   | User Access | Full Access |
-
-4. Click **Create**
-
----
-
-## Step 5: Fill in App Information
-
-### 5.1 App Information Tab
-
-Navigate to **App Information** and fill in:
-
-| Field | Value |
-|-------|-------|
-| Subtitle | Network Status Monitor |
-| Category | Utilities |
-| Content Rights | This app does not contain third-party content |
-
-### 5.2 Privacy Policy
-
-1. Scroll to **Privacy Policy URL**
-2. Enter: `https://gdemay.github.io/Online-now/privacy.html`
-
-### 5.3 Age Rating
-
-Click **Set Up Age Rating** and answer the questionnaire:
-
-- All answers should be **No** (no objectionable content)
-- Result will be **4+**
-
----
-
-## Step 6: Prepare Version Information
-
-### 6.1 App Description
-
-Go to **iOS App** → **Version Information**:
-
-```
-Online Now is your essential network connectivity companion. Monitor your internet connection status in real-time with a beautiful, intuitive interface.
-
-KEY FEATURES:
-• Real-time connectivity monitoring
-• Connection type detection (WiFi, Cellular, Ethernet)
-• VPN status detection
-• Network quality indicators
-• Connection history tracking
-• Speed test functionality
-• Low Data Mode awareness
-
-PERFECT FOR:
-• Troubleshooting connection issues
-• Monitoring network reliability
-• Understanding your connectivity patterns
-• Ensuring you're always online when it matters
-
-Online Now uses Apple's Network framework for accurate, battery-efficient monitoring. No data is collected or transmitted - your privacy is fully protected.
-
-Requires iOS 17.0 or later.
+```text
+ASC_KEY_TYPE=team
+ASC_KEY_ID=<Key ID>
+ASC_ISSUER_ID=<Issuer UUID>
+ASC_PRIVATE_KEY_PATH=<absolute path to the securely mounted .p8>
+ASC_STRICT_AUTH=true
+ASC_TELEMETRY_DISABLED=1
+DO_NOT_TRACK=1
 ```
 
-### 6.2 Keywords
+The private-key file must be readable only by its owner (`0600`). Do not print it, put it in command substitutions, commit it, use `asc auth token` in logs, or enable API debug logging during release work. Keep any config or key outside the repository. A complete environment credential set with no selected `ASC_PROFILE` skips stored credentials. If using a stored profile instead, explicitly select that profile rather than mixing credentials from different accounts.
 
-```
-network,connectivity,wifi,internet,connection,status,monitor,speed,test,vpn,cellular
-```
+An Account Holder or Admin can generate the team key in [Users and Access → Integrations](https://appstoreconnect.apple.com/access/integrations/api). Initial API access and legal agreements require the Account Holder. A new API key does not accept agreements, repair banking/tax information, or prove the donation product is approved.
 
-### 6.3 Support & Marketing URLs
+## 2. Inspect the existing app and pipeline without changing them
 
-| Field | URL |
-|-------|-----|
-| Support URL | https://gdemay.github.io/Online-now/support.html |
-| Marketing URL | https://gdemay.github.io/Online-now/ |
+With `asc` on `PATH` and authentication configured:
 
-### 6.4 What's New (Release Notes)
-
-```
-Initial release of Online Now!
-
-• Real-time network monitoring
-• Connection type detection
-• VPN status tracking
-• Speed testing
-• Connection history
+```bash
+asc version
+asc api GET /v1/apps/6758242393
+asc versions list --app 6758242393 --platform IOS --paginate --output json
+asc xcode-cloud workflows list --app 6758242393 --paginate --output json
+asc iap list --app 6758242393 --product-id onlinenow.gdemay --include-versions --paginate --output json
+asc builds list --app 6758242393 --platform IOS --version 1.2.0 --processing-state all --paginate --output json
 ```
 
----
+Alternatively, run the read-only preflight using the installed executable:
 
-## Step 7: Take Screenshots
-
-You need screenshots for each device size you support.
-
-### Required Screenshot Sizes
-
-| Device | Resolution | Required |
-|--------|------------|----------|
-| iPhone 6.9" Display | 1320 x 2868 | Yes (for iPhone 16 Pro Max) |
-| iPhone 6.7" Display | 1290 x 2796 | Yes (for iPhone 15 Pro Max) |
-| iPhone 6.5" Display | 1284 x 2778 | Yes (for older Pro Max models) |
-| iPhone 5.5" Display | 1242 x 2208 | Optional |
-| iPad Pro 12.9" | 2048 x 2732 | Yes (if iPad supported) |
-
-### How to Take Screenshots
-
-1. Run the app in Simulator:
-   ```bash
-   cd /Users/gdemay/Documents/Saas/Online-now
-   open OnlineNow.xcodeproj
-   ```
-
-2. Select each device size in Xcode
-3. Run the app (⌘R)
-4. Press ⌘S in Simulator to take a screenshot
-5. Screenshots save to Desktop
-
-### Recommended Screenshots
-
-1. **Main View (Online)** - Show green "You're Online" status
-2. **Main View (Offline)** - Show red "You're Offline" status
-3. **Speed Test** - Show speed test results
-4. **Connection Details** - Show WiFi/VPN/connection info
-5. **History View** - Show connection history
-
----
-
-## Step 8: Build and Upload
-
-### 8.1 Configure Signing in Xcode
-
-1. Open `OnlineNow.xcodeproj` in Xcode
-2. Select the project in the navigator
-3. Select **OnlineNow** target
-4. Go to **Signing & Capabilities** tab
-5. Check **Automatically manage signing**
-6. Select your **Team** (your Apple Developer account)
-7. Xcode will create the provisioning profile automatically
-
-### 8.2 Archive the App
-
-1. In Xcode, select **Any iOS Device (arm64)** as the destination
-2. Menu: **Product** → **Archive**
-3. Wait for the archive to complete
-4. The Organizer window will open automatically
-
-### 8.3 Upload to App Store Connect
-
-1. In Organizer, select your archive
-2. Click **Distribute App**
-3. Select **App Store Connect** → Next
-4. Select **Upload** → Next
-5. Keep default options checked:
-   - ✅ Upload your app's symbols
-   - ✅ Manage version and build number
-6. Click **Next**
-7. Select your Distribution certificate
-8. Click **Upload**
-9. Wait for upload to complete (5-10 minutes)
-
----
-
-## Step 9: Submit for Review
-
-### 9.1 Select the Build
-
-1. Go to App Store Connect → Your App → iOS App
-2. Scroll to **Build** section
-3. Click **Select a Build**
-4. Choose the build you just uploaded
-5. Click **Done**
-
-### 9.2 Export Compliance
-
-When prompted:
-- **Does this app use encryption?** → **No**
-  (We already set `ITSAppUsesNonExemptEncryption` to `NO`)
-
-### 9.3 App Review Information
-
-Fill in contact info for the review team:
-
-| Field | Value |
-|-------|-------|
-| First Name | Your first name |
-| Last Name | Your last name |
-| Phone | Your phone number |
-| Email | Your email |
-
-Notes for Review:
-```
-This app monitors network connectivity status using Apple's Network framework.
-To test:
-1. Launch the app to see your current connection status
-2. Toggle WiFi/Airplane mode to see real-time updates
-3. Tap the speed button to run a speed test
-No login or special setup required.
+```bash
+ASC_BIN=/workspace/scratch/bin/asc scripts/app_store_preflight.sh
 ```
 
-### 9.4 Submit
+It runs only these read operations and prints a bounded summary without credentials. It rejects an unexpected app/bundle and reports missing workflows/product as blockers. It does not establish that a release is ready.
 
-1. Click **Add for Review**
-2. Review all information
-3. Click **Submit to App Review**
+Verify that the returned app is `com.gdemay.onlinenow` in the intended production account. The app response does not expose the signing Team ID: confirm `GB87Z9SKC5` in the existing workflow/signing configuration. Keep the existing consumable ID; do not replace it to work around a missing catalog.
 
----
+Select the actual workflow ID from the response, then inspect it:
 
-## Step 10: Wait for Review
+```bash
+asc xcode-cloud workflows view --id "$WORKFLOW_ID" --output json
+asc xcode-cloud workflows repository --id "$WORKFLOW_ID" --output json
+```
 
-- **Typical review time**: 24-48 hours
-- You'll receive an email when review is complete
-- Check App Store Connect for status updates
+The existing `Default` workflow has been observed to trigger for `main`; a candidate branch push alone does not establish that a build started. Merge the prepared candidate with its native test gate into `main`, then identify that exact commit's run. The workflow must use this repository and the shared `OnlineNow` scheme. In Xcode Cloud's workflow settings, verify:
 
-### Possible Outcomes
+- A Test action runs `OnlineNowTests` and `OnlineNowUITests` on an available iOS simulator, or the repository's post-build test gate executes those tests and fails the build on any failure. Passing only Build or Analyze does not run these tests. Preserve the test gate's `.xcresult` and console summary when tests are invoked by a script instead of a native workflow Test action.
+- An Archive action uses Release configuration, the existing production team, and App Store distribution signing.
+- Distribution uploads an App Store eligible build to App Store Connect. A build limited to internal TestFlight testing cannot be attached to an App Store release.
+- The candidate branch is selectable, and the archive carries version `1.2.0` with an unused build number.
 
-| Status | Meaning | Action |
-|--------|---------|--------|
-| In Review | Apple is reviewing | Wait |
-| Approved | Ready for sale! | 🎉 Celebrate! |
-| Rejected | Issues found | Read feedback, fix, resubmit |
+Existing Xcode Cloud signing and archive/distribution actions can build and upload remotely from this Linux workspace. A separate local Mac, signing private key, or manually uploaded IPA is unnecessary for that route. A new pipeline's initial setup or changes to TestFlight post-actions may need the authenticated Xcode Cloud interface; the public workflow API does not expose every web-only option. Confirm those settings before triggering a release build.
 
----
+## 3. Run the candidate and inspect the results
 
-## 🎉 Post-Approval Checklist
+The existing push-triggered workflow can run after the candidate is merged to `main`, without an API key. If an explicit run is needed after authentication, identify the configured workflow ID and the merged source commit first:
 
-Once approved:
+```bash
+asc xcode-cloud run --workflow-id "$WORKFLOW_ID" --branch main --wait --poll-interval 30s --timeout 1h --output json
+```
 
-- [ ] Verify app appears in App Store search
-- [ ] Update `docs/index.html` with your real App Store link
-- [ ] Share on social media
-- [ ] Monitor reviews and ratings
-- [ ] Respond to user feedback
+Use the returned build-run ID for `RUN_ID`. Record the source commit SHA and compare it with the intended candidate; do not select a similarly named earlier build.
 
----
+```bash
+asc xcode-cloud status --run-id "$RUN_ID" --output json
+asc xcode-cloud actions list --run-id "$RUN_ID" --paginate --output json
+asc xcode-cloud artifacts list --run-id "$RUN_ID" --paginate --output json
+asc xcode-cloud build-runs builds --run-id "$RUN_ID" --paginate --output json
+```
 
-## ❓ Troubleshooting
+For each Test action ID from the actions response:
 
-### "No provisioning profiles found"
+```bash
+asc xcode-cloud test-results list --action-id "$TEST_ACTION_ID" --paginate --output json
+```
 
-1. In Xcode: Preferences → Accounts → Download Manual Profiles
-2. Or: Check that your Bundle ID matches exactly
+Require actual passing unit, StoreKit, and UI test results from the workflow Test actions or the repository's test gate, plus successful archive/distribution. An empty Test action list is not test evidence. Inspect retained screenshots and `.xcresult` artifacts for failures. `--doctor` mode is useful for diagnosis but can report a failed build with exit code zero; do not use that mode as the release success gate.
 
-### "App ID not available"
+The local StoreKit catalog checks accounting and the purchase UI. Before submission, test the real App Store Connect sandbox catalog on a development build with local StoreKit configuration disabled, or in TestFlight, including product lookup, purchase, cancellation, and repeated tips. Follow [TIPPING_SETUP_GUIDE.md](TIPPING_SETUP_GUIDE.md). TestFlight sandbox purchases do not charge real money.
 
-The bundle ID might be taken. Try a unique variation like:
-- `com.gdemay.onlinenow.app`
-- `com.yourdomain.onlinenow`
+## 4. Stage the processed build and metadata
 
-### Build upload fails
+Get `BUILD_ID` from the selected run's builds response. It is the App Store Connect build resource ID, not the human-readable build number.
 
-1. Check your internet connection
-2. Ensure Xcode is up to date
-3. Try: Xcode → Preferences → Accounts → Sign out/in
+```bash
+asc builds list --app 6758242393 --platform IOS --version 1.2.0 --processing-state all --paginate --output json
+asc release stage --app 6758242393 --version 1.2.0 --platform IOS --build-id "$BUILD_ID" --copy-metadata-from 1.1 --exclude-fields whatsNew --dry-run
+```
 
-### Rejection for "Minimum Functionality"
+The public listing reported live version `1.1` on 2026-10-22, released on 2026-02-13 with “We added a donation button.” Confirm the live source version string from step 2 before using `1.1`. Exclude its old `whatsNew` field and set the 1.2.0 release notes below. Require that the exact build belongs to this app, has marketing version `1.2.0`, finished processing as `VALID`, and is eligible for App Store distribution. Then stage:
 
-Add more visible features or improve the description to clarify the app's value.
+```bash
+asc release stage --app 6758242393 --version 1.2.0 --platform IOS --build-id "$BUILD_ID" --copy-metadata-from 1.1 --exclude-fields whatsNew --confirm
+asc versions list --app 6758242393 --platform IOS --version 1.2.0 --output json
+```
 
----
+Staging creates or reuses the version, copies version localization text, attaches the build, and validates public-API readiness. It does not submit. Copying text does not set screenshots, age ratings, category, review details, or pricing; resolve any reported blockers. A staged checkpoint may remain applied when validation fails, so inspect before retrying.
 
-## 📞 Need Help?
+Use the returned version resource ID for `VERSION_ID`. Read its configured locales, then update What's New with the actual release changes for each supported locale:
 
-- **Apple Developer Support**: [developer.apple.com/support](https://developer.apple.com/support)
-- **App Review Guidelines**: [developer.apple.com/app-store/review/guidelines](https://developer.apple.com/app-store/review/guidelines)
-- **Project Issues**: [github.com/GDemay/Online-now/issues](https://github.com/GDemay/Online-now/issues)
+```bash
+asc localizations list --version "$VERSION_ID" --output json
+asc localizations update --version "$VERSION_ID" --locale en-US --whats-new "Improved connection checks, manual speed testing, donation handling, accessible controls, and CSV history sharing."
+asc validate --app 6758242393 --version 1.2.0 --strict --output json
+asc review doctor --app 6758242393 --version 1.2.0 --output json
+```
+
+Use the exact locale codes returned by the API; `en-US` is an example only when that localization exists. Check app privacy, regulations/permits declarations, export compliance, review contact details, screenshots, and paid-app agreements in App Store Connect where the public API does not expose a complete check. Only the Account Holder can accept the Paid Applications Agreement; banking/tax prerequisites remain separate from this CLI workflow.
+
+If the donation product needs review, inspect its resource and version IDs:
+
+```bash
+asc iap list --app 6758242393 --product-id onlinenow.gdemay --include-versions --paginate --output json
+asc iap versions list --iap-id "$IAP_ID" --paginate --output json
+```
+
+Require the intended consumable product, completed metadata/pricing/availability, and an approved product or a reviewable IAP version to include with the app. The consumable's product identifier is different from `IAP_ID` and `IAP_VERSION_ID` resource IDs.
+
+## 5. Submit for review, then publish after approval
+
+Reuse an appropriate existing draft submission when one is present, rather than creating duplicate submissions:
+
+```bash
+asc review submissions list --app 6758242393 --platform IOS --paginate --output json
+```
+
+When a new draft is needed, create it, take `SUBMISSION_ID` from its response, and attach the version:
+
+```bash
+asc review submissions-create --app 6758242393 --platform IOS --output json
+asc review items-add --submission "$SUBMISSION_ID" --item-type appStoreVersions --item-id "$VERSION_ID" --if-exists skip
+```
+
+Only when the consumable has a reviewable IAP version requiring inclusion, also add that exact version:
+
+```bash
+asc review items-add --submission "$SUBMISSION_ID" --item-type inAppPurchaseVersions --item-id "$IAP_VERSION_ID" --if-exists skip
+```
+
+After release checks pass:
+
+```bash
+asc review submissions-submit --id "$SUBMISSION_ID" --confirm
+asc submit status --version-id "$VERSION_ID" --output json
+```
+
+Submission sends the app to Apple; it does not make the app live. For an approved version set to manual release and in `PENDING_DEVELOPER_RELEASE`:
+
+```bash
+asc versions release --version-id "$VERSION_ID" --confirm
+asc versions view --version-id "$VERSION_ID" --include-build --include-submission --output json
+```
+
+For `AFTER_APPROVAL`, Apple publishes after approval and processing without that manual-release command. Confirm the final version state is `READY_FOR_DISTRIBUTION` (or the older `READY_FOR_SALE` spelling), and verify the public listing shows `1.2.0`. Preserve source SHA, run/build/version/submission IDs, test results, and the actual final status in the release record. Do not label a prepared candidate, uploaded build, or pending review as a published release.
+
+## Sources
+
+- [Apple roles and access](https://developer.apple.com/support/roles/): App Manager, Xcode Cloud, version creation, app/IAP submission, and Account Holder agreements.
+- [Apple API keys](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api/): team/individual key generation and scope.
+- [Apple: start an Xcode Cloud build](https://developer.apple.com/documentation/appstoreconnectapi/post-v1-cibuildruns): official API route used by the CLI.
+- [Apple: submit an app](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app/): review submission requirements.
+- [asc 5.16.0 release](https://github.com/rorkai/App-Store-Connect-CLI/releases/tag/5.16.0) and [Xcode Cloud commands](https://github.com/rorkai/App-Store-Connect-CLI/blob/5.16.0/commands/xcode-cloud.mdx).
