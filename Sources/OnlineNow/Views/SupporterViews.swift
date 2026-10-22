@@ -88,9 +88,12 @@ public struct TipPromptView: View {
             }
             .buttonStyle(OnlineNowPrimaryButtonStyle())
             .accessibilityIdentifier("tipPrompt.open")
-            Button("Not now", action: onDismiss)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("tipPrompt.dismiss")
+            Button(action: onDismiss) {
+                Text("Not now")
+                    .foregroundStyle(Color.primary)
+                    .frame(minHeight: 44)
+            }
+            .accessibilityIdentifier("tipPrompt.dismiss")
         }
         .padding(24)
         #if os(macOS)
