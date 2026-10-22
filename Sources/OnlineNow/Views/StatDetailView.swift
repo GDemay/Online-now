@@ -226,7 +226,7 @@ public struct StatDetailView: View {
                         .foregroundStyle(Color.primary.opacity(0.75))
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: dynamicTypeSize.isAccessibilitySize ? 2 : 4)) { _ in
+                    AxisMarks(values: chartAxisDates) { _ in
                         AxisGridLine()
                         AxisValueLabel(format: dynamicTypeSize.isAccessibilitySize
                             ? .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
@@ -259,6 +259,12 @@ public struct StatDetailView: View {
     private var plotColor: Color {
         statType == .latency ? OnlineNowColors.warningText(in: colorScheme)
             : OnlineNowColors.informationText(in: colorScheme)
+    }
+
+    private var chartAxisDates: [Date] {
+        guard let first = chartData.first?.timestamp, let last = chartData.last?.timestamp else { return [] }
+        // Automatic desiredCount is advisory and can still crowd a small chart.
+        return first == last ? [first] : [first, last]
     }
 
     private var benchmarkSection: some View {
