@@ -456,6 +456,11 @@ final class OnlineNowVisualReviewTests: XCTestCase {
 
     @MainActor
     func testVisualTipFailureAndRecovery() async throws {
+        // Register the freshly installed app with the simulator StoreKit service
+        // before configuring fault injection. A never-launched app returns nil.
+        launch(scenario: "offline")
+        require(app.buttons["connectivity.refresh"])
+        app.terminate()
         let session = try configureStore()
         let simulatedFailure = SKTestFailures.Purchase.generic(.unknown)
         try await session.setSimulatedError(simulatedFailure, forAPI: .purchase)
@@ -491,6 +496,11 @@ final class OnlineNowVisualReviewTests: XCTestCase {
 
     @MainActor
     func testVisualTipCancellation() async throws {
+        // Register the freshly installed app with the simulator StoreKit service
+        // before configuring fault injection. A never-launched app returns nil.
+        launch(scenario: "offline")
+        require(app.buttons["connectivity.refresh"])
+        app.terminate()
         let session = try configureStore()
         let cancellation = SKTestFailures.Purchase.generic(.userCancelled)
         try await session.setSimulatedError(cancellation, forAPI: .purchase)
@@ -518,7 +528,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         XCTAssertNil(clearedCancellation)
         app.terminate()
 
-        // Separately observe real checkout dismissal when this simulator presents it.
+        // Exercise the actual checkout X separately from fault injection.
         session.disableDialogs = false
         launch(scenario: "offline")
         tap("navigation.tipJar")
@@ -528,26 +538,74 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         let initialCount = recordedTipCount()
         scrollTo(purchase)
         purchase.tap()
-        let cancel = app.buttons.matching(NSPredicate(format: "label == %@", "Cancel")).firstMatch
-        let systemCancel = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-            .buttons.matching(NSPredicate(format: "label == %@", "Cancel")).firstMatch
-        if cancel.waitForExistence(timeout: 8) {
-            capture("tip-payment-confirmation")
-            cancel.tap()
-        } else if systemCancel.exists {
-            capture("tip-payment-system-confirmation")
-            systemCancel.tap()
+        XCTAssertTrue(waitUntil(15) {
+            self.storeKitCheckoutHeading() != nil || (self.storeKitConfirmationAction() != nil && self.storeKitDismissButton() != nil)
+        }, "The actual StoreKit confirmation must appear before cancellation")
+        capture("tip-payment-confirmation")
+        if let close = storeKitDismissButton() {
+            close.tap()
         } else {
-            // Record an environment limitation rather than claiming a cancellation.
-            capture("tip-payment-cancellation-ui-unavailable")
-            print("ONLINE_NOW_VISUAL_OBSERVATION payment-cancellation-ui-available=false")
-            return
+            // Use the observed native checkout heading as the coordinate anchor.
+            // This fallback never taps a guessed point without the Xcode title.
+            let heading = try XCTUnwrap(storeKitCheckoutHeading())
+            let screen = app.frame
+            let sheetWidth = min(screen.width - 16, 440)
+            let point = CGPoint(x: screen.midX - sheetWidth / 2 + 32, y: heading.frame.midY)
+            XCTAssertTrue(screen.contains(point))
+            XCTAssertLessThan(point.x, heading.frame.minX)
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: point.x - screen.minX, dy: point.y - screen.minY)).tap()
         }
-        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        XCTAssertTrue(waitUntil(15) {
+            self.storeKitCheckoutHeading() == nil && self.storeKitConfirmationAction() == nil
+                && purchase.exists && purchase.isHittable && purchase.isEnabled
+        }, "Cancelling must dismiss StoreKit and re-enable the tip action")
+        XCTAssertFalse(app.staticTexts["tipJar.error"].waitForExistence(timeout: 2))
         XCTAssertEqual(recordedTipCount(), initialCount)
         XCTAssertFalse(app.alerts["Thank you!"].exists)
+        XCTAssertFalse(session.allTransactions().contains { $0.state == .purchased || $0.state == .deferred })
         capture("tip-payment-cancelled")
-        print("ONLINE_NOW_VISUAL_OBSERVATION payment-cancellation-ui-available=true")
+        print("ONLINE_NOW_VISUAL_OBSERVATION payment-cancellation-ui-dismissed=true purchase-enabled=true credited=false error-message-visible=false")
+    }
+
+    /// Query only already-running hosts; never activate a service to find a button.
+    private func runningCheckoutHosts() -> [XCUIApplication] {
+        [XCUIApplication(bundleIdentifier: "com.apple.ios.StoreKitUIService"),
+         XCUIApplication(bundleIdentifier: "com.apple.springboard"), app].filter {
+            $0.state == .runningForeground || $0.state == .runningBackground
+        }
+    }
+
+    private func storeKitCheckoutHeading() -> XCUIElement? {
+        for host in runningCheckoutHosts() {
+            let headings = host.staticTexts.matching(NSPredicate(format: "label == %@", "Xcode"))
+            for heading in headings.allElementsBoundByIndex where heading.exists && heading.isHittable {
+                if !heading.frame.isEmpty && heading.frame.intersects(app.frame) { return heading }
+            }
+        }
+        return nil
+    }
+
+    /// Inspect the native confirmation action only; this test never confirms a purchase.
+    private func storeKitConfirmationAction() -> XCUIElement? {
+        for host in runningCheckoutHosts() {
+            for button in host.buttons.matching(NSPredicate(format: "label == %@", "Purchase")).allElementsBoundByIndex {
+                if button.identifier != "tipJar.purchase", button.exists, button.isHittable { return button }
+            }
+        }
+        return nil
+    }
+
+    private func storeKitDismissButton() -> XCUIElement? {
+        let labels = ["Close", "close", "Cancel", "cancel", "Dismiss", "dismiss", "X", "x", "×", "Cancel Purchase", "Cancel purchase"]
+        for host in runningCheckoutHosts() {
+            let candidates = host.buttons.matching(NSPredicate(format: "label IN %@ OR identifier IN %@", labels, labels))
+            for button in candidates.allElementsBoundByIndex.reversed() {
+                guard button.identifier != "tipJar.close", button.exists, button.isHittable else { continue }
+                return button
+            }
+        }
+        return nil
     }
 
     func testVisualDarkMode() throws {
