@@ -168,7 +168,7 @@ public struct TipJarView: View {
             Task { await tippingManager.loadProducts() }
         } label: {
             Label("Try again", systemImage: "arrow.clockwise")
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary)
                 .frame(minHeight: 44)
         }
         .buttonStyle(.bordered)

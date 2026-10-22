@@ -217,7 +217,7 @@ public struct ConnectivityStatusView: View {
             actionTask = Task { await viewModel.quickCheck() }
         } label: {
             Label("Refresh", systemImage: "arrow.clockwise")
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary)
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.bordered)
@@ -294,10 +294,10 @@ public struct ConnectivityStatusView: View {
 
     private var statusBackgroundColor: Color {
         switch viewModel.state {
-        case .online: return OnlineNowColors.successText(in: colorScheme)
-        case .offline: return OnlineNowColors.errorText(in: colorScheme)
-        case .limitedConnectivity: return OnlineNowColors.warningText(in: colorScheme)
-        case .checking, .measuringSpeed: return OnlineNowColors.informationText(in: colorScheme)
+        case .online: return .green
+        case .offline: return .red
+        case .limitedConnectivity: return .orange
+        case .checking, .measuringSpeed: return .blue
         default: return .gray
         }
     }
@@ -393,10 +393,10 @@ public struct ConnectivityStatusView: View {
 
     private var statusTitleColor: Color {
         switch viewModel.state {
-        case .online: return .green
-        case .offline: return .red
-        case .limitedConnectivity: return .orange
-        case .checking, .measuringSpeed: return .blue
+        case .online: return OnlineNowColors.successText(in: colorScheme)
+        case .offline: return OnlineNowColors.errorText(in: colorScheme)
+        case .limitedConnectivity: return OnlineNowColors.warningText(in: colorScheme)
+        case .checking, .measuringSpeed: return OnlineNowColors.informationText(in: colorScheme)
         default: return .primary
         }
     }
