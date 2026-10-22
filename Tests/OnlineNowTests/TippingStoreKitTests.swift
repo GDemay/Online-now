@@ -212,10 +212,14 @@ final class TippingStoreKitTests: XCTestCase {
 
     private func waitUntil(timeout: TimeInterval, _ condition: () async -> Bool) async throws -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
-        while !(await condition()), Date() < deadline {
+        while true {
+            // StoreKit receipts are asynchronous snapshots. Preserve the first
+            // successful observation instead of asking a second snapshot to
+            // repeat it after the polling loop has already succeeded.
+            if await condition() { return true }
+            guard Date() < deadline else { return false }
             try await Task.sleep(nanoseconds: 50_000_000)
         }
-        return await condition()
     }
 }
 #endif

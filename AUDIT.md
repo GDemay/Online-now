@@ -23,6 +23,23 @@ workflow's Archive/Test on the resulting
 main build has not yet passed or been selected at this checkpoint. None of these
 follow-up changes are in submitted build 17.
 
+## Required main run 42 and test-helper correction
+
+PR #6 merged as `1d84bad580250bb48a6b1c871852428881d462b9`. Its required
+Archive succeeded, but Test reported **64 passed, seven intentional skips and
+one failure**. All five UI workflows passed. The recovery unit case failed at
+its fixture-readiness assertion in 0.335 seconds, before starting the production
+recovery manager, despite a 10-second polling timeout.
+
+The private unit-test `waitUntil` helper re-evaluated its asynchronous predicate
+after the polling loop succeeded. A verified receipt observed by the first
+snapshot could therefore be discarded by the next snapshot. The follow-up
+returns immediately on the first successful observation. It preserves every
+verified-receipt, production recovery, transaction-finish and exactly-once
+assertion; it does not increase timeouts or change application code. Require a
+fresh exact-source main Archive/Test pass before selecting a release build.
+Build 42 was not uploaded or selected.
+
 ## Findings addressed
 
 | Area | Defect and resulting behavior |
