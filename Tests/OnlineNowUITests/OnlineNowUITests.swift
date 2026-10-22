@@ -286,21 +286,21 @@ final class OnlineNowVisualReviewTests: XCTestCase {
             let about = identified("statDetail.description")
             require(about)
             scrollTo(about)
-            capture("detail-\(name)-about")
+            capture("detail-\(name)-about", showing: about)
             if name == "speed" || name == "tcp" {
                 let plot = identified("statDetail.plot")
                 require(plot)
                 scrollTo(plot)
-                capture("detail-\(name)-history-chart")
+                capture("detail-\(name)-history-chart", showing: plot)
             }
             let benchmarks = identified("statDetail.benchmarks")
             require(benchmarks)
             scrollTo(benchmarks)
-            capture("detail-\(name)-benchmarks")
+            capture("detail-\(name)-benchmarks", showing: benchmarks)
             let tips = identified("statDetail.tips")
             require(tips)
             scrollTo(tips)
-            capture("detail-\(name)-guidance")
+            capture("detail-\(name)-guidance", showing: tips)
             app.buttons["Done"].tap()
         }
     }
@@ -606,6 +606,12 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         tap("navigation.history")
         require(app.buttons["history.export"])
         capture("dark-history")
+        let averageSpeed = identified("history.averageSpeed")
+        scrollTo(averageSpeed)
+        capture("dark-history-average-speed", showing: averageSpeed)
+        let measuredRecord = measuredHistoryRecord
+        scrollTo(measuredRecord)
+        capture("dark-history-record-with-speed", showing: measuredRecord)
         app.buttons["Done"].tap()
         tap("navigation.tipJar")
         require(app.buttons["tipJar.purchase"], timeout: 15)
@@ -635,9 +641,13 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         let plot = identified("statDetail.plot")
         require(plot)
         scrollTo(plot, maximumSwipes: 20)
-        capture("ax5-speed-detail-history-chart")
-        scrollTo(identified("statDetail.benchmarks"), maximumSwipes: 20)
-        capture("ax5-speed-detail-benchmarks")
+        capture("ax5-speed-detail-history-chart", showing: plot)
+        let benchmarks = identified("statDetail.benchmarks")
+        scrollTo(benchmarks, maximumSwipes: 20)
+        capture("ax5-speed-detail-benchmarks", showing: benchmarks, allowTallSection: true)
+        let lowerBenchmark = app.staticTexts["< 10 Mbps"]
+        scrollTo(lowerBenchmark)
+        capture("ax5-speed-detail-benchmarks-lower", showing: lowerBenchmark)
         app.buttons["Done"].tap()
         tap("navigation.history")
         require(app.buttons["history.export"])
@@ -645,24 +655,21 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         let averageSpeed = identified("history.averageSpeed")
         require(averageSpeed)
         scrollTo(averageSpeed, maximumSwipes: 20)
-        capture("ax5-history-average-speed")
+        capture("ax5-history-average-speed", showing: averageSpeed)
         let record = identified("history.record")
         scrollTo(record, maximumSwipes: 20)
         require(record)
-        capture("ax5-history-records")
-        let measuredRecord = app.descendants(matching: .any)
-            .matching(identifier: "history.record")
-            .matching(NSPredicate(format: "label CONTAINS %@", "Speed:"))
-            .firstMatch
+        capture("ax5-history-records", showing: record)
+        let measuredRecord = measuredHistoryRecord
         scrollTo(measuredRecord, maximumSwipes: 20)
         require(measuredRecord)
-        capture("ax5-history-record-with-speed")
+        capture("ax5-history-record-with-speed", showing: measuredRecord)
         app.buttons["Done"].tap()
         tap("navigation.tipJar")
         require(app.buttons["tipJar.purchase"], timeout: 15)
         capture("ax5-tip-jar-top")
         scrollTo(app.buttons["tipJar.purchase"], maximumSwipes: 16)
-        capture("ax5-tip-jar-purchase")
+        capture("ax5-tip-jar-purchase", showing: app.buttons["tipJar.purchase"])
         print("ONLINE_NOW_VISUAL_OBSERVATION ax5-purchase-hittable=\(app.buttons["tipJar.purchase"].isHittable)")
     }
 
@@ -722,15 +729,19 @@ final class OnlineNowVisualReviewTests: XCTestCase {
 
         launch(scenario: "offline", flags: ["--tip-unavailable"])
         tap("navigation.tipJar")
-        require(app.staticTexts["tipJar.unavailable"])
-        capture("tip-catalog-unavailable")
+        let unavailable = identified("tipJar.unavailable")
+        scrollTo(unavailable)
+        require(unavailable)
+        capture("tip-catalog-unavailable", showing: unavailable)
         XCTAssertTrue(app.buttons["tipJar.retry"].exists)
         app.terminate()
 
         launch(scenario: "offline", flags: ["--tip-loading"])
         tap("navigation.tipJar")
-        require(app.descendants(matching: .any).matching(identifier: "tipJar.loading").firstMatch)
-        capture("tip-catalog-loading")
+        let loading = identified("tipJar.loading")
+        scrollTo(loading)
+        require(loading)
+        capture("tip-catalog-loading", showing: loading)
         app.terminate()
 
         launch(scenario: "offline", flags: ["--temporary-history"])
@@ -757,6 +768,9 @@ final class OnlineNowVisualReviewTests: XCTestCase {
             XCTFail("The app declares landscape support but did not rotate within ten seconds")
             return
         }
+        // Check the first landscape viewport before any automated scrolling.
+        requireViewport(textContaining("You're Online"), context: "landscape-home-status")
+        requireViewport(app.buttons["connectivity.refresh"], context: "landscape-home-refresh")
         capture("landscape-home")
 
         scrollTo(app.buttons["connectivity.refresh"])
@@ -773,8 +787,9 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         XCTAssertTrue(app.buttons["history.export"].isHittable)
         XCTAssertTrue(app.buttons["history.clear"].isHittable)
         capture("landscape-history-overview")
-        scrollTo(identified("history.record"))
-        capture("landscape-history-records")
+        let record = identified("history.record")
+        scrollTo(record)
+        capture("landscape-history-records", showing: record)
         app.buttons["Done"].tap()
 
         scrollTo(app.buttons["connectivity.speed"])
@@ -785,7 +800,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         let plot = identified("statDetail.plot")
         require(plot)
         scrollTo(plot)
-        capture("landscape-speed-detail-chart")
+        capture("landscape-speed-detail-chart", showing: plot)
         app.buttons["Done"].tap()
 
         tap("navigation.tipJar")
@@ -803,7 +818,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
         XCTAssertTrue(purchase.isHittable)
         XCTAssertTrue(app.buttons["tipJar.close"].isHittable)
-        capture("landscape-tip-jar-purchase")
+        capture("landscape-tip-jar-purchase", showing: purchase)
         app.buttons["tipJar.close"].tap()
         require(app.buttons["navigation.history"])
         XCTAssertTrue(app.buttons["navigation.history"].isHittable)
@@ -872,6 +887,13 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
+    private var measuredHistoryRecord: XCUIElement {
+        app.descendants(matching: .any)
+            .matching(identifier: "history.record")
+            .matching(NSPredicate(format: "label CONTAINS %@", "Speed:"))
+            .firstMatch
+    }
+
     /// The last visible scroll view belongs to the current sheet, rather than
     /// the still-present Home scroll view underneath a modal on iPad.
     private var activeScrollView: XCUIElement? {
@@ -895,11 +917,81 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         return viewport.insetBy(dx: 6, dy: 10)
     }
 
+    private func occupiesViewport(_ frame: CGRect, viewport: CGRect) -> Bool {
+        guard !frame.isEmpty, !frame.isNull, !viewport.isEmpty else { return false }
+        let horizontal = frame.minX >= viewport.minX - 8 && frame.maxX <= viewport.maxX + 8
+        if frame.height > viewport.height {
+            // A section taller than the display is captured from its beginning.
+            return horizontal && frame.minY >= viewport.minY - 8 && frame.minY <= viewport.minY + 35
+        }
+        return horizontal && frame.minY >= viewport.minY - 8 && frame.maxY <= viewport.maxY + 8
+    }
+
+    /// History and statistics initially open at the medium detent. Short content
+    /// drags can resize that sheet and then snap back without scrolling content.
+    private func expandActiveSheetIfNeeded() {
+        guard app.buttons["Done"].exists, !app.buttons["tipJar.close"].exists,
+              let scroll = activeScrollView else { return }
+        let screen = app.frame
+        let initial = scroll.frame.intersection(screen)
+        guard initial.minY > screen.minY + screen.height * 0.15,
+              initial.height < screen.height * 0.9 else { return }
+
+        for attempt in 0..<2 {
+            guard let current = activeScrollView else { return }
+            let before = current.frame.intersection(screen)
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let frontBar = app.navigationBars.allElementsBoundByIndex.last {
+                $0.exists && $0.buttons["Done"].exists
+            }
+            let grabber = app.otherElements.matching(NSPredicate(format: "label == %@", "Grabber"))
+                .allElementsBoundByIndex.last {
+                    $0.exists && $0.frame.intersects(before) && $0.frame.height < 50
+                }
+            let barTop = frontBar?.frame.minY ?? before.minY + 16
+            let grabberY = grabber?.frame.midY ?? min(before.minY + 8, barTop - 8)
+            let grabberX = grabber?.frame.midX ?? before.midX
+            // Prefer the native grabber; otherwise stay above the front toolbar.
+            let start = origin.withOffset(CGVector(
+                dx: grabberX - screen.minX,
+                dy: max(6, grabberY - screen.minY)))
+            let end = origin.withOffset(CGVector(
+                dx: grabberX - screen.minX,
+                dy: screen.height * 0.08))
+            start.press(forDuration: 0.05, thenDragTo: end)
+            let expanded = waitUntil(3) {
+                guard let updated = self.activeScrollView else { return false }
+                let after = updated.frame.intersection(screen)
+                return after.minY < before.minY - screen.height * 0.1
+                    || after.height > before.height + screen.height * 0.1
+            }
+            print("ONLINE_NOW_SHEET_EXPANSION attempt=\(attempt + 1) expanded=\(expanded) before=\(before) after=\(String(describing: activeScrollView?.frame))")
+            if expanded { return }
+        }
+    }
+
+    private func requireViewport(_ element: XCUIElement, context: String, allowTallSection: Bool = false,
+                                 file: StaticString = #filePath, line: UInt = #line) {
+        let exists = element.waitForExistence(timeout: 5)
+        let viewport = visibleViewport(for: activeScrollView)
+        let frame = exists ? element.frame : .zero
+        let fits = allowTallSection || frame.height <= viewport.height + 16
+        let visible = exists && fits && occupiesViewport(frame, viewport: viewport)
+        print("ONLINE_NOW_VIEWPORT context=\(context) visible=\(visible) exists=\(exists) target=\(frame) viewport=\(viewport)")
+        if !visible { capture("\(context)-viewport-failure") }
+        XCTAssertTrue(visible, "Capture target must occupy the visible viewport: \(context)", file: file, line: line)
+    }
+
     private func scrollTo(_ element: XCUIElement, maximumSwipes: Int = 16,
                           towardsTopWhenMissing: Bool = false) {
+        let initialViewport = visibleViewport(for: activeScrollView)
+        if !element.exists || !occupiesViewport(element.frame, viewport: initialViewport) {
+            expandActiveSheetIfNeeded()
+        }
         var previousFrame: CGRect?
         var stationaryDrags = 0
-        for attempt in 0..<maximumSwipes {
+        var nativeFallbacks = 0
+        for attempt in 0..<min(maximumSwipes, 12) {
             let scroll = activeScrollView
             let viewport = visibleViewport(for: scroll)
             let exists = element.exists
@@ -909,22 +1001,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
             }
             if exists, let previousFrame, abs(frame.minY - previousFrame.minY) < 2 { stationaryDrags += 1 }
             else { stationaryDrags = 0 }
-            if stationaryDrags >= 2 {
-                print("ONLINE_NOW_SCROLL_OBSERVATION stationary-after=\(attempt) target=\(frame) viewport=\(viewport)")
-                return
-            }
-            previousFrame = exists ? frame : nil
-            if exists, !frame.isEmpty {
-                if frame.height <= viewport.height,
-                   viewport.contains(CGPoint(x: frame.midX, y: frame.minY)),
-                   viewport.contains(CGPoint(x: frame.midX, y: frame.maxY)) {
-                    return
-                }
-                if frame.height > viewport.height,
-                   frame.minY >= viewport.minY - 8, frame.minY <= viewport.minY + 35 {
-                    return
-                }
-            }
+            if exists, occupiesViewport(frame, viewport: viewport) { return }
             let delta: CGFloat
             if exists, !frame.isEmpty {
                 delta = frame.height > viewport.height
@@ -932,6 +1009,21 @@ final class OnlineNowVisualReviewTests: XCTestCase {
             } else {
                 delta = viewport.height * (towardsTopWhenMissing ? -0.25 : 0.25)
             }
+            if stationaryDrags >= 2 || (!exists && attempt % 3 == 2) {
+                guard nativeFallbacks < 2 else {
+                    print("ONLINE_NOW_SCROLL_OBSERVATION bounded-stop attempt=\(attempt) target=\(frame) viewport=\(viewport)")
+                    return
+                }
+                nativeFallbacks += 1
+                // A native full swipe also materializes lazy History rows.
+                if delta >= 0 { scroll?.swipeUp(velocity: .slow) }
+                else { scroll?.swipeDown(velocity: .slow) }
+                stationaryDrags = 0
+                previousFrame = nil
+                print("ONLINE_NOW_SCROLL_OBSERVATION native-fallback=\(nativeFallbacks) direction=\(delta >= 0 ? "up" : "down")")
+                continue
+            }
+            previousFrame = exists ? frame : nil
             let step = min(viewport.height * 0.25, max(28, abs(delta)))
             let x = viewport.minX + viewport.width * 0.88
             let midY = viewport.midY
@@ -993,5 +1085,10 @@ final class OnlineNowVisualReviewTests: XCTestCase {
             print("ONLINE_NOW_MARKETING_SCREENSHOT_CHUNK id=\(id) index=\(index) data=\(chunk)")
         }
         print("ONLINE_NOW_MARKETING_SCREENSHOT_END id=\(id)")
+    }
+
+    private func capture(_ name: String, showing element: XCUIElement, allowTallSection: Bool = false) {
+        requireViewport(element, context: name, allowTallSection: allowTallSection)
+        capture(name)
     }
 }

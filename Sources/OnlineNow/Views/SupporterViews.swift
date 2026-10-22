@@ -1,5 +1,24 @@
 import SwiftUI
 
+enum OnlineNowColors {
+    // Fixed contrast for white button text in both light and dark appearances.
+    static let actionFill = Color(red: 0.04, green: 0.28, blue: 0.60)
+}
+
+@available(iOS 15.0, macOS 12.0, *)
+struct OnlineNowPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .foregroundStyle(.white)
+            .background(OnlineNowColors.actionFill, in: RoundedRectangle(cornerRadius: 12))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.86 : 1) : 0.45)
+    }
+}
+
 @available(iOS 15.0, macOS 12.0, *)
 public struct TipPromptView: View {
     let trigger: TipPromptTrigger
@@ -38,7 +57,7 @@ public struct TipPromptView: View {
                 .font(.title3.bold())
                 .accessibilityAddTraits(.isHeader)
             Text(trigger.message)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button(action: onShowTipJar) {
@@ -46,7 +65,7 @@ public struct TipPromptView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(OnlineNowPrimaryButtonStyle())
             .accessibilityIdentifier("tipPrompt.open")
             Button("Not now", action: onDismiss)
                 .frame(minHeight: 44)
@@ -90,10 +109,10 @@ public struct SupporterBenefitsView: View {
                         Text("\(tippingManager.tipCount) tip\(tippingManager.tipCount == 1 ? "" : "s") recorded on this device")
                     }
                     Text("Tips help maintain Online Now. They are entirely optional and do not unlock additional features or services.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                     Text("Tip history is saved on this device. Consumable tips cannot be restored after reinstalling the app.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
                 .multilineTextAlignment(.center)
                 .padding(24)

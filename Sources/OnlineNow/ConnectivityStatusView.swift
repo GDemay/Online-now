@@ -199,7 +199,7 @@ public struct ConnectivityStatusView: View {
             }
             Text("Speed tests download data and use your current Wi-Fi or mobile plan. They run only when you choose Test Speed.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .fixedSize(horizontal: false, vertical: true)
 
             if let error = viewModel.errorMessage {
@@ -235,7 +235,7 @@ public struct ConnectivityStatusView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 44)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(OnlineNowPrimaryButtonStyle())
         .disabled(isBusy || !viewModel.isConnected || viewModel.isPreviewMode)
         .accessibilityIdentifier("connectivity.speedTest")
         .accessibilityHint("Downloads test data to measure your connection speed")
@@ -304,47 +304,52 @@ public struct ConnectivityStatusView: View {
     // MARK: - Hero Section
 
     private func heroSection(geometry: GeometryProxy) -> some View {
-        VStack(spacing: 16) {
+        let compact = geometry.size.height < 430 && geometry.size.width > geometry.size.height
+        let logoSize = min(geometry.size.width * 0.5, compact ? 64 : 200)
+
+        return VStack(spacing: compact ? 8 : 16) {
             // Logo
             ZStack {
                 if viewModel.state == .checking || viewModel.state == .measuringSpeed
                     || viewModel.state == .idle
                 {
-                    LoadingRingView(size: min(geometry.size.width * 0.5, 200))
+                    LoadingRingView(size: logoSize)
                 } else {
                     LogoView(
-                        size: min(geometry.size.width * 0.5, 200),
+                        size: logoSize,
                         isAnimating: false,
                         isOnline: viewModel.state == .online
                     )
                 }
             }
-            .frame(height: min(geometry.size.width * 0.5, 200))
+            .frame(height: logoSize)
             .accessibilityHidden(true)
 
             // App title
-            Text("Online Now")
-                .font(.system(.title2, design: .rounded, weight: .bold))
-                .foregroundStyle(.primary)
+            if !compact {
+                Text("Online Now")
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                    .foregroundStyle(.primary)
+            }
 
             // Status text
             VStack(spacing: 8) {
                 Text(statusTitle)
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(.system(compact ? .title2 : .largeTitle, design: .rounded, weight: .bold))
                     .foregroundStyle(statusTitleColor)
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.4), value: viewModel.state)
 
                 Text(statusSubtitle)
                     .font(.body.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
             }
             .padding(.horizontal)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityStatusLabel)
         }
-        .padding(.top, 20)
+        .padding(.top, compact ? 8 : 20)
         .padding(.bottom, 8)
     }
 
@@ -501,12 +506,12 @@ public struct ConnectivityStatusView: View {
             headerLayout {
                 Label("Recent Activity", systemImage: "clock")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                 if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 16) }
                 if let timeAgo = viewModel.historyManager.timeSinceLastCheck() {
                     Text(timeAgo)
                         .font(.footnote.weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
 
@@ -540,7 +545,7 @@ public struct ConnectivityStatusView: View {
                     detailLayout {
                         Text(check.connectionType)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.primary.opacity(0.75))
 
                         if let speed = check.speedMbps {
                             if !dynamicTypeSize.isAccessibilitySize {
@@ -548,7 +553,7 @@ public struct ConnectivityStatusView: View {
                             }
                             Text(String(format: "%.1f Mbps", speed))
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.primary.opacity(0.75))
                         }
 
                         if check.isVPNActive {
@@ -589,7 +594,7 @@ public struct ConnectivityStatusView: View {
         VStack(alignment: .leading, spacing: 16) {
             Label("Network Details", systemImage: "info.circle")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
 
             VStack(spacing: 12) {
                 NetworkInfoRow(
@@ -613,7 +618,7 @@ public struct ConnectivityStatusView: View {
                     icon: "g.circle.fill",
                     label: "Google",
                     value: endpointStatus(viewModel.isGoogleReachable),
-                    valueColor: viewModel.isGoogleReachable ? .green : .secondary
+                    valueColor: viewModel.isGoogleReachable ? .green : Color.primary.opacity(0.75)
                 )
 
                 Divider()
@@ -622,7 +627,7 @@ public struct ConnectivityStatusView: View {
                     icon: "server.rack",
                     label: "Cloudflare HTTPS",
                     value: endpointStatus(viewModel.isCloudflareReachable),
-                    valueColor: viewModel.isCloudflareReachable ? .green : .secondary
+                    valueColor: viewModel.isCloudflareReachable ? .green : Color.primary.opacity(0.75)
                 )
 
                 Divider()
@@ -669,7 +674,7 @@ public struct ConnectivityStatusView: View {
                         icon: "clock.arrow.circlepath",
                         label: "Last Updated",
                         value: formatTime(lastCheck),
-                        valueColor: .secondary
+                        valueColor: Color.primary.opacity(0.75)
                     )
                 }
             }
@@ -750,13 +755,13 @@ struct MiniStatCard: View {
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
 
             Text(title)
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -862,12 +867,12 @@ struct NetworkInfoRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .frame(width: 24)
                 .accessibilityHidden(true)
             Text(label)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

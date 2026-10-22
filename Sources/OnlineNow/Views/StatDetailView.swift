@@ -155,13 +155,13 @@ public struct StatDetailView: View {
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
 
             Text(statType == .speed ? "Last Measured Download Speed" : "Current \(statType.rawValue)")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
@@ -175,7 +175,7 @@ public struct StatDetailView: View {
 
             Text(statType.description)
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -193,7 +193,7 @@ public struct StatDetailView: View {
             if chartData.isEmpty {
                 Text(statType == .speed ? "Run Test Speed to start your speed history." : "Latency history appears after a successful connection check.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 40)
@@ -259,7 +259,7 @@ public struct StatDetailView: View {
                                 .font(.subheadline.weight(.medium))
                             Text(benchmark.range)
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.primary.opacity(0.75))
                         }
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -271,7 +271,7 @@ public struct StatDetailView: View {
                             Spacer()
                             Text(benchmark.range)
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.primary.opacity(0.75))
                         }
                     }
                 }
@@ -303,7 +303,7 @@ public struct StatDetailView: View {
                             .accessibilityHidden(true)
                         Text(tip)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.primary.opacity(0.75))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
