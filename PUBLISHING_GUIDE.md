@@ -2,21 +2,25 @@
 
 This updates the existing app; do not create another App Store Connect app or change its bundle identifier.
 
+**Current status, 22 October 2026:** Apple accepted submission `dbdb1c40-2d72-4b31-9cbe-d68d393ccc18` at `2026-10-22T16:12:10.53Z`. App version 1.2.0 and its first consumable are both `WAITING_FOR_REVIEW`, with release policy `AFTER_APPROVAL`. **1.2.0 is not live.** Monitor this submission; do not upload, stage, or submit it again. Mutation examples below apply only to a future editable candidate.
+
 | Item | Expected value |
 | --- | --- |
 | App Store Connect app ID | `6758242393` |
 | Bundle identifier | `com.gdemay.onlinenow` |
 | Production developer team | `GB87Z9SKC5` |
-| Current published version | `1.1` — recheck before staging |
-| Candidate version | `1.2.0` |
-| Candidate source branch | `fix/ios-audit-1.2.0`, merged to `main` for the existing automatic workflow |
+| Current published version | `1.1` — 1.2.0 is awaiting review |
+| Submitted version/build | `1.2.0` / `17` |
+| Verified binary source | `86f8f6d60f3f12c181c1b4512f2635f39b201a1e` |
 | Consumable tip product ID | `onlinenow.gdemay` |
 
-Commands below were checked against `asc 5.16.0` help. The CLI's maintained upstream is [rorkai/App-Store-Connect-CLI](https://github.com/rorkai/App-Store-Connect-CLI), which the former `rudrankriyam` repository redirects to. The checksum-verified Linux executable in this workspace is `/workspace/scratch/bin/asc`.
+Commands below were checked against `asc 5.16.0` help. The CLI's maintained upstream is [rorkai/App-Store-Connect-CLI](https://github.com/rorkai/App-Store-Connect-CLI), which the former `rudrankriyam` repository redirects to. Install a verified executable and put `asc` on `PATH`; a workspace-specific executable or wrapper path is not required.
 
 ## 1. Configure the smallest sufficient API access
 
 Use an App Store Connect **team API key with the App Manager role** for the existing production account. Supply its Key ID, Issuer ID, and `.p8` private-key file through the environment's credential/file mechanism. The Issuer ID is a UUID; **it is not** developer Team ID `GB87Z9SKC5`.
+
+This release successfully authenticated using the user-provided App Store Connect API key and issuer through a private wrapper outside the repository. Reuse the securely configured authentication route; no Apple ID password is needed for these API operations.
 
 App Manager can use Xcode Cloud, create versions, manage app metadata, and submit the app and its in-app purchase for review. Developer alone cannot complete this release: Apple's role table gives it read-only Xcode Cloud access and no app-version creation or app submission. Admin is unnecessary for an already configured signing/build pipeline. A team key covers all the account's apps and cannot be limited to only this app.
 
@@ -51,10 +55,10 @@ asc iap list --app 6758242393 --product-id onlinenow.gdemay --include-versions -
 asc builds list --app 6758242393 --platform IOS --version 1.2.0 --processing-state all --paginate --output json
 ```
 
-Alternatively, run the read-only preflight using the installed executable:
+Alternatively, run the read-only preflight, setting `ASC_BIN` only if the authenticated executable is not on `PATH`:
 
 ```bash
-ASC_BIN=/workspace/scratch/bin/asc scripts/app_store_preflight.sh
+scripts/app_store_preflight.sh
 ```
 
 It runs only these read operations and prints a bounded summary without credentials. It rejects an unexpected app/bundle and reports missing workflows/product as blockers. It does not establish that a release is ready.
@@ -75,9 +79,11 @@ The existing `Default` workflow has been observed to trigger for `main`; a candi
 - Distribution uploads an App Store eligible build to App Store Connect. A build limited to internal TestFlight testing cannot be attached to an App Store release.
 - The candidate branch is selectable, and the archive carries version `1.2.0` with an unused build number.
 
-Existing Xcode Cloud signing and archive/distribution actions can build and upload remotely from this Linux workspace. A separate local Mac, signing private key, or manually uploaded IPA is unnecessary for that route. A new pipeline's initial setup or changes to TestFlight post-actions may need the authenticated Xcode Cloud interface; the public workflow API does not expose every web-only option. Confirm those settings before triggering a release build.
+Existing Xcode Cloud signing and Archive actions build and sign remotely. If Cloud does not import the exported App Store IPA automatically, `asc builds upload` can upload that signed IPA from Linux; this route was verified for build 17. A local Mac is not needed to upload an already signed artifact. A new pipeline's initial setup or changes to TestFlight post-actions may need the authenticated Xcode Cloud interface; the public workflow API does not expose every web-only option.
 
 ## 3. Run the candidate and inspect the results
+
+Build 17 passed its required native Xcode Cloud Archive and Test actions: **53 passed, seven intentionally skipped live-network tests, zero failures; all four UI tests passed**. These results apply to source `86f8f6d60f3f12c181c1b4512f2635f39b201a1e`. Preserve that SHA when recording later documentation changes.
 
 The existing push-triggered workflow can run after the candidate is merged to `main`, without an API key. If an explicit run is needed after authentication, identify the configured workflow ID and the merged source commit first:
 
@@ -102,36 +108,40 @@ asc xcode-cloud test-results list --action-id "$TEST_ACTION_ID" --paginate --out
 
 Require actual passing unit, StoreKit, and UI test results from the required workflow Test action, plus successful archive/distribution. An empty Test action list is not test evidence. Inspect retained screenshots and `.xcresult` artifacts for failures. `--doctor` mode is useful for diagnosis but can report a failed build with exit code zero; do not use that mode as the release success gate.
 
-The local StoreKit catalog checks accounting and the purchase UI. Before submission, test the real App Store Connect sandbox catalog on a development build with local StoreKit configuration disabled, or in TestFlight, including product lookup, purchase, cancellation, and repeated tips. Follow [TIPPING_SETUP_GUIDE.md](TIPPING_SETUP_GUIDE.md). TestFlight sandbox purchases do not charge real money.
+The local StoreKit catalog checks accounting and the purchase UI; it does not prove live catalog or payment-account readiness. Separately test the real App Store Connect sandbox catalog on a development build with local StoreKit configuration disabled, or in TestFlight, including product lookup, purchase, cancellation, and repeated tips. Follow [TIPPING_SETUP_GUIDE.md](TIPPING_SETUP_GUIDE.md). TestFlight sandbox purchases do not charge real money. **TestFlight beta review is not required to submit directly for App Store review.** Record physical-device and live-store limitations separately from the passing simulator tests.
 
 ## 4. Stage the processed build and metadata
 
-Get `BUILD_ID` from the selected run's builds response. It is the App Store Connect build resource ID, not the human-readable build number.
+Version 1.2.0 build 17 is already uploaded, processed, attached, and submitted. Inspect its existing resources without restaging them:
 
 ```bash
 asc builds list --app 6758242393 --platform IOS --version 1.2.0 --processing-state all --paginate --output json
-asc release stage --app 6758242393 --version 1.2.0 --platform IOS --build-id "$BUILD_ID" --copy-metadata-from 1.1 --exclude-fields whatsNew --dry-run
+asc versions view --version-id 5d67ab34-1833-4bab-b3c0-016f2f4f51f1 --include-build --include-submission --output json
 ```
 
-The public listing reported live version `1.1` on 2026-10-22, released on 2026-02-13 with “We added a donation button.” Confirm the live source version string from step 2 before using `1.1`. Exclude its old `whatsNew` field and set the 1.2.0 release notes below. Require that the exact build belongs to this app, has marketing version `1.2.0`, finished processing as `VALID`, and is eligible for App Store distribution. Then stage:
+For a future candidate, identify the exact run's signed App Store IPA and source SHA first. If it has no imported build, upload once, then use the returned `BUILD_ID`; it is a resource ID, not the human-readable build number:
 
 ```bash
-asc release stage --app 6758242393 --version 1.2.0 --platform IOS --build-id "$BUILD_ID" --copy-metadata-from 1.1 --exclude-fields whatsNew --confirm
-asc versions list --app 6758242393 --platform IOS --version 1.2.0 --output json
+asc builds upload --app 6758242393 --ipa "$SIGNED_APP_STORE_IPA" --platform IOS --wait --poll-interval 30s --output json
+asc builds info --build-id "$BUILD_ID" --output json
+asc builds pre-release-version view --build-id "$BUILD_ID" --output json
 ```
 
-Staging creates or reuses the version, copies version localization text, attaches the build, and validates public-API readiness. It does not submit. Copying text does not set screenshots, age ratings, category, review details, or pricing; resolve any reported blockers. A staged checkpoint may remain applied when validation fails, so inspect before retrying.
+Require the expected app, marketing version, build number, `VALID` processing state, and App Store eligibility. Create or reuse the future editable version and attach that exact build. Copying metadata does not establish screenshot, age-rating, review-detail, privacy, or pricing readiness. A staged checkpoint may remain applied when validation fails, so inspect before retrying.
 
-Use the returned version resource ID for `VERSION_ID`. Read its configured locales, then update What's New with the actual release changes for each supported locale:
+Use the future version's resource ID for `NEXT_VERSION_ID`, inspect its actual locales, and write release notes for that version. The current primary locale is `en-GB`:
 
 ```bash
-asc localizations list --version "$VERSION_ID" --output json
-asc localizations update --version "$VERSION_ID" --locale en-US --whats-new "Improved connection checks, manual speed testing, donation handling, accessible controls, and CSV history sharing."
-asc validate --app 6758242393 --version 1.2.0 --strict --output json
-asc review doctor --app 6758242393 --version 1.2.0 --output json
+asc versions attach-build --version-id "$NEXT_VERSION_ID" --build-id "$BUILD_ID" --wait --output json
+asc localizations list --version "$NEXT_VERSION_ID" --output json
+asc localizations update --version "$NEXT_VERSION_ID" --locale en-GB --whats-new "$RELEASE_NOTES"
+asc validate --app 6758242393 --version-id "$NEXT_VERSION_ID" --ipa "$SIGNED_APP_STORE_IPA" --strict --output json
+asc review doctor --app 6758242393 --version-id "$NEXT_VERSION_ID" --output json
 ```
 
-Use the exact locale codes returned by the API; `en-US` is an example only when that localization exists. Check app privacy, regulations/permits declarations, export compliance, review contact details, screenshots, and paid-app agreements in App Store Connect where the public API does not expose a complete check. Only the Account Holder can accept the Paid Applications Agreement; banking/tax prerequisites remain separate from this CLI workflow.
+Use only locale codes returned by the API. Check app privacy, regulations/permits declarations, export compliance, review contact details, screenshots, and paid-app agreements in App Store Connect where the public API does not expose a complete check. Only the Account Holder can accept the Paid Applications Agreement; banking/tax prerequisites remain separate from this CLI workflow.
+
+**Privacy URL retention:** the current App Store `privacyPolicyUrl` is [PRIVACY.md on `release/privacy-1.2.0`](https://github.com/GDemay/Online-now/blob/release/privacy-1.2.0/PRIVACY.md), published at commit `d6b4d70`. **Retain branch `release/privacy-1.2.0` indefinitely while this metadata URL uses it.** Verify a replacement is public and update App Store metadata before retiring the branch. GitHub Pages source has been corrected, but deployment run `39804752290` is queued during Actions degradation; the fallback privacy page is already public and must remain available.
 
 If the donation product needs review, inspect its resource and version IDs:
 
@@ -140,41 +150,44 @@ asc iap list --app 6758242393 --product-id onlinenow.gdemay --include-versions -
 asc iap versions list --iap-id "$IAP_ID" --paginate --output json
 ```
 
-Require the intended consumable product, completed metadata/pricing/availability, and an approved product or a reviewable IAP version to include with the app. The consumable's product identifier is different from `IAP_ID` and `IAP_VERSION_ID` resource IDs.
+Require the intended consumable product and completed metadata/pricing/availability. Its first version must be included with a new app version in the **same unified review submission**. The consumable's product identifier is different from `IAP_ID` and `IAP_VERSION_ID` resource IDs.
 
 ## 5. Submit for review, then publish after approval
 
-Reuse an appropriate existing draft submission when one is present, rather than creating duplicate submissions:
+For the current release, monitor the already accepted unified submission:
 
 ```bash
-asc review submissions list --app 6758242393 --platform IOS --paginate --output json
+asc submit status --id dbdb1c40-2d72-4b31-9cbe-d68d393ccc18 --output json
+asc review status --app 6758242393 --version 1.2.0 --output json
 ```
 
-When a new draft is needed, create it, take `SUBMISSION_ID` from its response, and attach the version:
+For a future editable candidate, first list submissions and reuse an appropriate existing draft. Create one only when needed, take `NEW_SUBMISSION_ID` from its response, and add the future app version:
 
 ```bash
+asc review submissions-list --app 6758242393 --platform IOS --paginate --output json
 asc review submissions-create --app 6758242393 --platform IOS --output json
-asc review items-add --submission "$SUBMISSION_ID" --item-type appStoreVersions --item-id "$VERSION_ID" --if-exists skip
+asc review items-add --submission "$NEW_SUBMISSION_ID" --item-type appStoreVersions --item-id "$NEXT_VERSION_ID" --if-exists skip
 ```
 
-Only when the consumable has a reviewable IAP version requiring inclusion, also add that exact version:
+The first consumable must be added to that same submission before submitting either item. Later IAP versions requiring review can also be included. Use the IAP **version** resource ID, not the product ID:
 
 ```bash
-asc review items-add --submission "$SUBMISSION_ID" --item-type inAppPurchaseVersions --item-id "$IAP_VERSION_ID" --if-exists skip
+asc review items-add --submission "$NEW_SUBMISSION_ID" --item-type inAppPurchaseVersions --item-id "$IAP_VERSION_ID" --if-exists skip
+asc review items-list --submission "$NEW_SUBMISSION_ID" --include appStoreVersion,inAppPurchaseVersion --paginate --output json
 ```
 
-After release checks pass:
+For that future submission only, after release checks pass and all intended items are present:
 
 ```bash
-asc review submissions-submit --id "$SUBMISSION_ID" --confirm
-asc submit status --version-id "$VERSION_ID" --output json
+asc review submissions-submit --id "$NEW_SUBMISSION_ID" --confirm
+asc submit status --id "$NEW_SUBMISSION_ID" --output json
 ```
 
 Submission sends the app to Apple; it does not make the app live. For an approved version set to manual release and in `PENDING_DEVELOPER_RELEASE`:
 
 ```bash
-asc versions release --version-id "$VERSION_ID" --confirm
-asc versions view --version-id "$VERSION_ID" --include-build --include-submission --output json
+asc versions release --version-id "$APPROVED_VERSION_ID" --confirm
+asc versions view --version-id "$APPROVED_VERSION_ID" --include-build --include-submission --output json
 ```
 
 For `AFTER_APPROVAL`, Apple publishes after approval and processing without that manual-release command. Confirm the final version state is `READY_FOR_DISTRIBUTION` (or the older `READY_FOR_SALE` spelling), and verify the public listing shows `1.2.0`. Preserve source SHA, run/build/version/submission IDs, test results, and the actual final status in the release record. Do not label a prepared candidate, uploaded build, or pending review as a published release.
@@ -185,4 +198,6 @@ For `AFTER_APPROVAL`, Apple publishes after approval and processing without that
 - [Apple API keys](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api/): team/individual key generation and scope.
 - [Apple: start an Xcode Cloud build](https://developer.apple.com/documentation/appstoreconnectapi/post-v1-cibuildruns): official API route used by the CLI.
 - [Apple: submit an app](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app/): review submission requirements.
+- [Apple: submit an In-App Purchase](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-in-app-purchase/): first consumable and app version must share one submission.
+- [Apple: invite external testers](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers/): TestFlight App Review applies to external beta distribution.
 - [asc 5.16.0 release](https://github.com/rorkai/App-Store-Connect-CLI/releases/tag/5.16.0) and [Xcode Cloud commands](https://github.com/rorkai/App-Store-Connect-CLI/blob/5.16.0/commands/xcode-cloud.mdx).

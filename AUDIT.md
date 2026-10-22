@@ -1,116 +1,150 @@
-# Online Now audit — 1.2.0 candidate
+# OnlineNow 1.2.0 audit and release evidence
 
-Audited 20 October 2026 against `e879b12` in `GDemay/Online-now`.
-The app is native SwiftUI with SwiftData local history and a StoreKit 2 consumable.
-This audit covers the source, project configuration, measurement services, history,
-SDK helpers, purchase handling, and release/test setup. It is not a completed device
-or App Store audit: no Apple SDK, simulator, device, or App Store Connect session
-is available in the execution environment.
+Updated 22 October 2026. **Version 1.2.0 (17) is waiting for Apple review; it is
+not live yet.** Apple accepted the app and its first consumable tip in one review
+submission at 16:12:10.53 UTC. Release is configured for after approval; live
+version 1.1 remains unchanged.
+
+This audit covers the SwiftUI application, SwiftData history, network services,
+StoreKit 2 purchases, accessibility, build configuration, and release metadata.
+The submitted binary comes from
+`86f8f6d60f3f12c181c1b4512f2635f39b201a1e`. Documentation commits after that
+source do not change the binary's identity.
 
 ## Findings addressed
 
-| Priority | Defect | Resulting behavior |
-| --- | --- | --- |
-| High | Checks stayed in `.checking` because final state resolution skipped busy states | Completion resolves online, limited, or offline; operations are serialized |
-| High | Canceled `NWPathMonitor` was reused; overlapping timers and old tasks survived transitions | Monitor restarts safely; foreground work is canceled and stale results discarded |
-| High | Automatic speed downloads consumed data without an explicit action | Only Test Speed downloads a sample; background and path changes run no speed tests |
-| High | Estimated warmup inflated reported speed | Throughput uses actual validated bytes divided by elapsed download time |
-| High | TCP callbacks and waiting timeouts could resume a continuation twice or hang | Serialized completion, overall deadline, and cancellation finish each probe once |
-| High | Empty App Store catalog left a blank tip jar | Visible unavailable message, retry, localized price, loading and purchase states |
-| High | Purchase result and transaction updates counted one tip twice | Verified transaction IDs deduplicate delivery and support refund bookkeeping |
-| High | Interrupted consumable deliveries were not recovered | Unfinished transactions are processed at startup before being finished |
-| Medium | Invalid retry configuration and cancellation could trap or keep work running | Bounded configuration and cooperative whole-operation timeout/cancellation |
-| Medium | Redirects and portal pages were treated as internet access | Expected provider HTTPS responses are validated; redirect following is disabled |
-| Medium | Captive probe was blocked by iOS transport policy | Narrow exception for `captive.apple.com`; HTTPS remains required elsewhere |
-| Medium | Missing measurements produced invented quality values | Quality uses only valid available measurements; otherwise Unknown |
-| Medium | Statistics summarized only 20 cached checks; timing fields were not populated | Statistics/export use retained records; TCP and HTTP timings remain separate |
-| Medium | History failure crashed startup or was silent | Existing store is preserved; session-only fallback and visible errors allow continued checks |
-| Medium | History export, Refresh, and Test Speed lacked usable actions | Accessible actions, CSV file export, clear confirmation, empty/error states |
-| Medium | Production screenshot gestures could replace live results with sample values | Simulation and UI fixtures are restricted to Debug builds |
-| Medium | Donation UI promised unimplemented benefits and summed currencies as USD | Optional support count and localized storefront prices; every feature stays free |
-| Medium | Build script could report success despite failed tests | Real commands and exit statuses are preserved |
-| Medium | No shared scheme or app test targets; stale versions/signing generator settings | App/unit/UI targets, shared scheme, catalog resources, aligned app signing identity and version |
-| Medium | Required-reason declaration omitted UserDefaults | Manifest declares app-local defaults use; unused disk-capacity declaration removed |
-| Low | Small tap targets, fixed text layouts, misleading DNS/VPN/latency labels | Larger accessible controls, adaptive layout, reduced-motion support, accurate measurement labels |
+| Area | Defect and resulting behavior |
+| --- | --- |
+| Connection state | Completed checks now leave the busy state and resolve online, limited, or offline. Serialized operations, cancellation, and stale-result protection prevent old checks overwriting the current connection. |
+| Lifecycle | A stopped `NWPathMonitor` is recreated. Timers and tasks stop in the background and restart safely in the foreground. Monitoring is foreground-only. |
+| Data use and speed | Speed downloads require Test Speed. Throughput uses validated received bytes and the complete measured transfer duration; invalid, incomplete, and portal responses are rejected. |
+| Network probes | TCP continuations complete once, with timeout and cancellation. Retries reject invalid configuration and cancel queued or waiting work. Reachability validates expected provider responses without following redirects. The transport exception is limited to `captive.apple.com`. |
+| Measurement clarity | TCP setup and HTTP response timings remain separate. Missing measurements produce Unknown quality. Labels describe estimates and possible VPN detection accurately. |
+| History | Retention, statistics, and CSV export use the newest 100 checks. Pruning explicitly selects retained records instead of offset-fetching pending inserts. Persistence and separate timing fields have native regression coverage. |
+| Storage failures | A failed persistent store is preserved. A session-only fallback and visible errors allow continued checks without silently deleting history. |
+| Tip jar | Empty catalog, loading, retry, pending, cancellation, success, and error states are visible. Prices use the current storefront. Every feature stays free; tips grant no promised paid benefits. |
+| Purchase delivery | Verified transaction IDs deduplicate purchase results and updates. Startup recovers unfinished consumables; persisted local bookkeeping handles refunds and avoids counting a tip twice. Corrupt ledger data is surfaced. |
+| UI and accessibility | Usable Refresh, Test Speed, export, and clear-history actions; confirmation and empty/error states; larger controls, adaptive large text, reduced motion, and accessible labels. Debug fixtures cannot replace production measurements. |
+| Build and privacy | Shared app/unit/UI scheme, bundled StoreKit catalog, aligned signing/version settings, accurate command exit statuses, and app-local UserDefaults required-reason declaration. Required Xcode Cloud Test and Archive actions replace the archive post-build test hook. |
+| Public information | Source copy fixes placeholder App Store links and misleading VPN, battery, monitoring, and history claims. Corrected listing text and a separately published privacy policy are in App Store metadata; the Pages deployment remains queued. |
 
-## Verification performed
+## Native verification
 
-- Swift 6.0.3 on Linux: the five Foundation transaction-ledger XCTest tests pass.
-- Thirteen network/retry regression tests pass in a scratch Linux harness using
-  the service source with `FoundationNetworking` imported, the Apple-only
-  `waitsForConnectivity` setter omitted, and Combine queue-observation types
-  replaced with no-op stand-ins. Retry, cancellation, timeout and measurement
-  logic are unchanged. This does not verify Apple networking or Combine behavior.
-  No application source depends on these harness adaptations.
-- Swift frontend parsing covers production, example, and test files in Debug
-  and Release configurations. Parsing does not typecheck Apple APIs.
-- Project references, shared-scheme XML, plist/catalog contents, version/signing
-  consistency, shell syntax, and whitespace are checked during preparation.
-- Deterministic regression tests were added for lifecycle/history, retries,
-  measurement validation, banner behavior, and purchases. App tests include a
-  bundled StoreKit catalog. UI tests cover offline refresh/history, large text,
-  and two repeatable consumable purchases.
-- Live internet tests are opt-in with `ONLINE_NOW_LIVE_NETWORK_TESTS=1`; they
-  are unsuitable as deterministic release gates.
+Xcode Cloud run `ff7ef6f0-90f0-49c5-8328-6193ca29d7f1` completed both required
+actions successfully for the submitted source:
 
-## Unverified release requirements
+| Check | Verified result |
+| --- | --- |
+| Native Test | 60 cases: **53 passed, seven intentionally skipped live-network cases, zero failures** |
+| Simulator UI | All four passed: offline refresh/history, repeat consumable purchases, actual Ask-to-Buy approval with pending state and relaunch persistence, and large-text navigation |
+| StoreKit recovery unit case | One unfinished consumable is recovered and finished, then a repeat purchase is delivered through transaction updates; persisted count is exactly two |
+| Archive and distribution export | SUCCEEDED; bundle `com.gdemay.onlinenow`, version 1.2.0, build 17, production team `GB87Z9SKC5`, App Store distribution |
+| IPA compatibility | iOS 17 minimum, iPhone/iPad device families, `ITSAppUsesNonExemptEncryption=false` |
+| Additional device-layout QA | Test-only run 16 succeeded on iPhone 13 Pro Max and iPad Pro 12.9-inch (6th generation); original native PNGs were reviewed and used for listing updates |
 
-1. Run the committed iOS verification workflow or `scripts/verify_build.sh` on
-   a Mac. No Actions run or Xcode Cloud check appeared for the candidate commits
-   after branch pushes and PR creation; the connected tools cannot dispatch or
-   enable the new workflow, or change Xcode Cloud workflow configuration. Inspect test results and screenshots; fix any Apple compiler/runtime
-   findings before distributing the candidate.
-2. Test airplane mode, Wi-Fi/cellular changes, background/foreground, constrained
-   networks, captive portals, and VoiceOver on a device. Deterministic fixtures
-   do not validate radio behavior or real portal routing.
-3. Validate an existing installation's SwiftData store during upgrade. The schema
-   is preserved, and no failed store is deleted, but migration has not run here.
-4. In App Store Connect, verify `onlinenow.gdemay` is an approved, available
-   consumable for `com.gdemay.onlinenow`; check agreements, banking and tax status.
-   No connected App Store Connect tool or signing credential is available here.
-5. Complete sandbox/TestFlight purchases, cancellation, delayed approval and
-   decline, interrupted delivery, and refund checks. Local StoreKit tests do not
-   establish the live catalog or payment-account readiness.
-6. Archive/sign with the existing production team, verify version/build against
-   App Store Connect, then upload and submit. No signed IPA or App Store release
-   was created during this audit.
+Native investigation also found and fixed a real SwiftData retention defect:
+offset fetches could mishandle pending inserts and delete a new check. The
+corrected history cases passed in subsequent native runs and in the final suite.
 
-## Known product boundaries
+Earlier headless StoreKit purchase tests were moved into the running app's UI,
+where purchase presentation and Ask-to-Buy approval passed. In run 15 the first
+outside-app consumable purchase succeeded, but a second purchase before finishing
+the first was rejected. The final unit fixture follows the recover/finish/repeat
+sequence above and passed in run 17. Production purchase-manager logic was not
+changed to accommodate the fixture failures.
 
-Download throughput is a short, single-server estimate including setup time.
-TCP setup is an RTT estimate, not an ICMP ping or signal-strength measurement.
-VPN detection is a tunnel heuristic. Success rate is a percentage of stored
-samples, not elapsed uptime. History retains 100 checks. Consumable support
-history is local; reinstalling does not restore finished consumables. An Ask to
-Buy approval clears pending state through transaction updates; after a decline,
-reopen the app to retry because StoreKit emits no consumable transaction update.
+Supplementary checks passed during preparation: five Linux Foundation
+transaction-ledger tests; thirteen retry/measurement cases in a scratch Linux
+harness; Debug/Release Swift parsing; project, scheme, plist, catalog, signing,
+version, shell, and whitespace checks. The Linux harness used
+`FoundationNetworking` and Apple/Combine stand-ins and was not a substitute for
+native execution. Live-network cases remain opt-in with
+`ONLINE_NOW_LIVE_NETWORK_TESTS=1`.
 
-## Native and App Store investigation — 22 October 2026
+## Payment and listing corrections
 
-App Store Connect authentication now works through an app-specific CLI wrapper
-outside the repository. The live version is 1.1; a 1.2.0 draft is being prepared
-with release after Apple approval. No API private key is stored in this repository.
+The existing consumable `onlinenow.gdemay` was **MISSING_METADATA**, without
+localization, a review screenshot, or an approved consumable version. This was a
+confirmed catalog blocker alongside the app's empty-catalog and transaction
+handling defects. The en-GB localization, review instructions, and genuine native
+tip-jar screenshot are now complete. Existing pricing and 175-territory
+availability were preserved.
 
-Xcode Cloud build 12 compiled the application and native test targets using
-Xcode 27.1 / iOS 27.0. Its first test run had 49 passing cases, 7 intentionally
-skipped live-network cases, 2 failing history cases and 1 deferred-purchase timeout.
-All three UI cases passed, including two consumable purchases and large text.
+The first consumable was submitted with the app in the same review submission.
+Both now read back **WAITING_FOR_REVIEW**. Local StoreKit success and accepted
+submission do not establish a completed live App Store payment.
 
-The history failures exposed SwiftData's handling of pending inserts in offset
-fetches: pruning could delete a newly inserted check. Retention now selects the
-newest 100 records explicitly without a paginated fetch, with independent-context
-persistence checks. Ask-to-Buy testing now approves the actual deferred
-transaction before awaiting purchase completion. These fixes require the next
-native run to establish that they pass.
+The listing accurately describes foreground checks, manual data use,
+measurement limits, local history, provider requests, and optional tips.
+Keywords and required age-rating answers were corrected; existing review
+contacts were preserved.
 
-The Default Xcode Cloud workflow now includes a first-class required Test action,
-using the shared OnlineNow scheme on an iPhone simulator. The redundant archive
-post-build test script has been removed; native test artifacts can be retrieved
-through App Store Connect instead of being discarded with a custom script's
-temporary workspace. The existing signed Archive action is preserved.
+All seven listing screenshots are **COMPLETE**: five iPhone and two iPad images.
+The inaccurate iPhone details image was replaced at position two; the other four
+iPhone assets and positions were preserved. iPad Home and History use fresh
+native captures in that order. Upload checksums, file sizes, and original
+1284×2778 / 2048×2732 dimensions matched before the superseded draft assets were
+deleted. Live 1.1 assets were independently verified unchanged. The capture's
+production `App`/`Sources` files match the submitted app; no images were resized
+or edited.
 
-The live consumable onlinenow.gdemay existed but was MISSING_METADATA, with no
-localization or review screenshot and no approved IAP version. An en-GB
-localization and review instructions were added while preserving the existing
-price and 175-territory availability. A genuine native tip-jar screenshot and
-review submission with the app are still required at this checkpoint.
+## Delivery record
+
+| Field | Verified value |
+| --- | --- |
+| App / version resource | `6758242393` / `5d67ab34-1833-4bab-b3c0-016f2f4f51f1` |
+| Submitted version/build/source | 1.2.0 (17), `86f8f6d60f3f12c181c1b4512f2635f39b201a1e` |
+| Cloud Archive / Test actions | `8746d46c-4939-4b9c-aa07-bcdf9483963c` / `3e637094-7ec3-4674-b667-8879c37a461d`, both SUCCEEDED |
+| IPA SHA-256 | `b0f5c308b61f0ac40dd694a030c4482e243c46dff23a99aa1cc679fff82a79ee` |
+| Imported and attached build | `a0a6e622-58c5-46d0-987f-69a7fe726308`, build 17, VALID / APP_STORE_ELIGIBLE |
+| Consumable version | `aa79aed6-3015-49c8-8cf7-b294dfffaf75` |
+| Unified submission | `dbdb1c40-2d72-4b31-9cbe-d68d393ccc18`, accepted 2026-10-22T16:12:10.53Z |
+| App and consumable review states | Both WAITING_FOR_REVIEW; 1.2.0 is not published |
+| Release policy | AFTER_APPROVAL |
+
+The already-signed IPA was uploaded from Linux through the App Store Connect CLI,
+processed, attached, and read back as build 17. Direct App Store submission did
+not require TestFlight beta review. Superseded private builds were not attached.
+
+Final pre-submission validation found zero errors and one expected warning:
+the first consumable was READY_TO_SUBMIT rather than approved. Strict mode
+labels warnings as blocking; review doctor reported zero blockers, and Apple
+accepted both intended items together. The public API cannot independently
+verify App Privacy questionnaire publication; that informational limitation was
+not an Apple submission rejection.
+
+## Privacy page and website follow-up
+
+App Store metadata uses the corrected policy at
+[PRIVACY.md](https://github.com/GDemay/Online-now/blob/release/privacy-1.2.0/PRIVACY.md),
+published at commit `d6b4d70`. The metadata update and readback were verified.
+**Retain branch `release/privacy-1.2.0` indefinitely while App Store metadata
+references it.** Verify and update a replacement URL before retiring the branch.
+
+Marketing and support destinations return HTTP 200 over verified TLS. GitHub
+Pages still serves old content while scoped rebuild `39804752290` is queued
+during GitHub Actions service degradation. Corrected source is committed; the
+published privacy fallback avoided depending on that rebuild for submission.
+Inspect the queued deployment and verify live copy when the service recovers.
+
+The CLI's optional URL checker disables proxy use and produced request failures
+for destinations that independent HTTPS GETs reached successfully. Preserve that
+distinction when assessing future URL-check warnings.
+
+## Remaining verification and product boundaries
+
+- Monitor Apple's app and first-consumable review; respond to any review issue.
+  Approval and public availability remain separate from accepted submission.
+- Physical-device radio transitions, real captive portals, constrained networks,
+  VoiceOver on hardware, and an existing installation's SwiftData upgrade were
+  not exercised here.
+- Verify sandbox/live-storefront catalog and payment behavior, including
+  cancellation, delayed approval/decline, interrupted delivery, and refunds.
+  Record the environment and storefront; local StoreKit fixtures do not prove
+  production payment readiness.
+- Speed is a short single-server download estimate including setup time. TCP
+  setup is not ICMP ping or signal strength. VPN detection is a tunnel heuristic.
+  Success rate describes stored samples rather than elapsed uptime.
+- History retains the newest 100 checks. Support history is local and finished
+  consumables cannot be restored after reinstalling. After an Ask-to-Buy decline,
+  reopen the app to retry because no consumable transaction update is emitted.
