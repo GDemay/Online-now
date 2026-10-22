@@ -444,7 +444,7 @@ struct HistoryRowView: View {
                 // Timestamp
                 Text(check.timestamp, format: .dateTime.month(.abbreviated).day().hour().minute().second())
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
             }
 
             Spacer()
@@ -457,7 +457,7 @@ struct HistoryRowView: View {
                         .monospacedDigit()
                     Text("Mbps")
                         .font(.caption2.weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
         }
