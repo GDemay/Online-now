@@ -135,6 +135,7 @@ public struct ConnectivityStatusView: View {
                 }
             }
             #endif
+            .accessibilityHidden(viewModel.tippingManager.shouldShowTipPrompt)
             .overlay(alignment: .top) {
                 // Preview mode indicator
                 if viewModel.isPreviewMode {
@@ -427,6 +428,7 @@ public struct ConnectivityStatusView: View {
                 )
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("connectivity.latency")
                 .accessibilityLabel("TCP setup estimate, \(currentValueFor(.latency)) milliseconds")
 
                 // Quality card - tappable
@@ -440,6 +442,7 @@ public struct ConnectivityStatusView: View {
                 )
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("connectivity.quality")
                 .accessibilityLabel("Connection quality, \(viewModel.signalQuality)")
 
                 // Connection type card - tappable
@@ -453,6 +456,7 @@ public struct ConnectivityStatusView: View {
                 )
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("connectivity.type")
                 .accessibilityLabel("Connection type, \(viewModel.connectionType.displayName)")
         }
     }

@@ -1,6 +1,7 @@
 #if canImport(SwiftData) && !SWIFT_PACKAGE
 import XCTest
 import SwiftData
+import Combine
 @testable import OnlineNow
 
 @available(iOS 17.0, macOS 14.0, *)
@@ -84,6 +85,60 @@ final class LifecycleHistoryTests: XCTestCase {
         XCTAssertTrue(csv.contains("\"'=test, \"\"quoted\"\"\nnext\""))
     }
 
+    func testReadingStatisticsDoesNotPublishOrClearStorageErrors() throws {
+        let history = HistoryManager()
+        history.saveCheck(ConnectivityCheck(
+            isConnected: false, connectionType: "None", isReachable: false
+        ))
+        let storageError = try XCTUnwrap(history.errorMessage)
+        var publications = 0
+        let observation = history.objectWillChange.sink { publications += 1 }
+        defer { observation.cancel() }
+
+        for _ in 0..<5 {
+            XCTAssertEqual(history.getStatistics().totalChecks, 0)
+        }
+        XCTAssertEqual(publications, 0, "Reading statistics during rendering must not invalidate the view")
+        XCTAssertEqual(history.errorMessage, storageError)
+    }
+
+    func testStatisticsRefreshWithStoredHistoryIndependentlyOfVisibleLimit() throws {
+        let (history, container) = try makeHistory()
+        defer { withExtendedLifetime(container) {} }
+        history.recordCheck(isConnected: true, connectionType: .wifi,
+                            isReachable: true, speedMbps: 40)
+        XCTAssertEqual(history.getStatistics().totalChecks, 1)
+        XCTAssertEqual(history.getStatistics().onlineCount, 1)
+        XCTAssertEqual(history.getStatistics().averageSpeedMbps, 40)
+
+        let writer = ModelContext(container)
+        writer.insert(ConnectivityCheck(
+            isConnected: false, connectionType: "None", isReachable: false
+        ))
+        writer.insert(ConnectivityCheck(
+            isConnected: true, connectionType: "WiFi", isReachable: false
+        ))
+        try writer.save()
+        history.fetchRecentChecks(limit: 1)
+        XCTAssertNil(history.errorMessage)
+        XCTAssertEqual(history.recentChecks.count, 1)
+        let statistics = history.getStatistics()
+        XCTAssertEqual(statistics.totalChecks, 3)
+        XCTAssertEqual(statistics.onlineCount, 1)
+        XCTAssertEqual(statistics.offlineCount, 1)
+        XCTAssertEqual(statistics.limitedCount, 1)
+        XCTAssertEqual(statistics.averageSpeedMbps, 40)
+
+        let reader = HistoryManager()
+        reader.configure(with: ModelContext(container))
+        XCTAssertEqual(reader.getStatistics().totalChecks, 3)
+        XCTAssertTrue(history.clearHistory())
+        XCTAssertEqual(history.getStatistics().totalChecks, 0)
+        XCTAssertNil(history.getStatistics().averageSpeedMbps)
+        reader.fetchRecentChecks()
+        XCTAssertEqual(reader.getStatistics().totalChecks, 0)
+    }
+
     func testUnconfiguredHistoryReportsFailureAndRecoversAfterConfiguration() throws {
         let history = HistoryManager()
         let check = ConnectivityCheck(isConnected: true, connectionType: "WiFi", isReachable: true)
@@ -128,6 +183,59 @@ final class LifecycleHistoryTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .online)
         XCTAssertFalse(viewModel.isPerformingCheck)
         XCTAssertEqual(speedTests, 1)
+        viewModel.stopMonitoring()
+    }
+
+    func testManualOfflineChecksPersistWithoutMakingNetworkRequests() async throws {
+        let (_, container) = try makeHistory()
+        defer { withExtendedLifetime(container) {} }
+        let viewModel = makeViewModel()
+        viewModel.historyManager.configure(with: container.mainContext)
+        var networkRequests = 0
+        viewModel.reachabilityCheck = {
+            networkRequests += 1
+            return ReachabilityResult(isReachable: true, responseTimeMs: 20, error: nil)
+        }
+        viewModel.speedMeasurement = {
+            networkRequests += 1
+            return SpeedTestResult(speedMbps: 20, bytesDownloaded: 1_000_000, durationSeconds: 0.4, error: nil)
+        }
+
+        let startedAt = Date()
+        await viewModel.quickCheck()
+        let firstID = try XCTUnwrap(viewModel.historyManager.lastCheck?.id)
+        let firstCheckTime = try XCTUnwrap(viewModel.lastCheckTime)
+        XCTAssertGreaterThanOrEqual(firstCheckTime, startedAt)
+        await viewModel.fullCheck()
+
+        let stored = try ModelContext(container).fetch(FetchDescriptor<ConnectivityCheck>())
+        XCTAssertEqual(stored.count, 2)
+        XCTAssertEqual(Set(stored.map(\.id)).count, 2)
+        XCTAssertTrue(stored.contains { $0.id == firstID })
+        XCTAssertTrue(stored.allSatisfy { !$0.isConnected && !$0.isReachable && $0.connectionType == ConnectionType.none.rawValue })
+        XCTAssertTrue(stored.allSatisfy { $0.speedMbps == nil && $0.rttMs == nil && $0.responseTimeMs == nil })
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(viewModel.lastCheckTime), firstCheckTime)
+        XCTAssertEqual(viewModel.state, .offline)
+        XCTAssertEqual(viewModel.signalQuality, "Offline")
+        XCTAssertFalse(viewModel.isPerformingCheck)
+        XCTAssertFalse(viewModel.isPerformingSpeedTest)
+        XCTAssertEqual(networkRequests, 0)
+        XCTAssertNil(viewModel.historyManager.errorMessage)
+        XCTAssertTrue(try viewModel.historyManager.exportCSV().contains("\"offline\""))
+    }
+
+    func testUnreachableInternetDoesNotClaimMissingWirelessSignal() async {
+        let viewModel = makeViewModel()
+        viewModel.reachabilityCheck = {
+            ReachabilityResult(isReachable: false, responseTimeMs: 0, error: "Internet unavailable")
+        }
+        viewModel.startMonitoring()
+        viewModel.applyNetworkSnapshot(connectedSnapshot, automaticallyCheck: false)
+        await viewModel.quickCheck()
+        XCTAssertTrue(viewModel.isConnected)
+        XCTAssertFalse(viewModel.isReachable)
+        XCTAssertEqual(viewModel.state, .limitedConnectivity)
+        XCTAssertEqual(viewModel.signalQuality, "Unavailable")
         viewModel.stopMonitoring()
     }
 

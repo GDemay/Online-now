@@ -13,6 +13,22 @@ public struct TipPromptView: View {
     }
 
     public var body: some View {
+        Group {
+            if #available(iOS 16.0, macOS 13.0, *) {
+                ViewThatFits(in: .vertical) {
+                    promptContent
+                        .fixedSize(horizontal: false, vertical: true)
+                    ScrollView { promptContent }
+                }
+            } else {
+                ScrollView { promptContent }
+            }
+        }
+        .frame(maxWidth: 560)
+        .accessibilityAddTraits(.isModal)
+    }
+
+    private var promptContent: some View {
         VStack(spacing: 16) {
             Image(systemName: "heart.fill")
                 .font(.largeTitle)

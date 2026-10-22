@@ -33,12 +33,19 @@ final class OnlineNowUITests: XCTestCase {
         app.launch()
         let refresh = app.buttons["connectivity.refresh"]
         XCTAssertTrue(refresh.waitForExistence(timeout: 10))
-        refresh.tap()
-        XCTAssertTrue(refresh.waitForEnabled(timeout: 10))
         app.buttons["navigation.history"].tap()
         XCTAssertTrue(app.otherElements["history.empty"].waitForExistence(timeout: 5)
                       || app.staticTexts["history.empty"].exists)
         attachScreenshot(named: "Online Now - Empty history")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+        refresh.tap()
+        XCTAssertTrue(refresh.waitForEnabled(timeout: 10))
+        app.buttons["navigation.history"].tap()
+        XCTAssertTrue(app.buttons["history.export"].waitForExistence(timeout: 5),
+                      "An offline refresh must save a diagnostic history entry")
+        XCTAssertFalse(app.otherElements["history.empty"].exists)
+        attachScreenshot(named: "Online Now - Offline refresh saved in history")
         app.buttons["Done"].tap()
         XCTAssertTrue(refresh.waitForExistence(timeout: 5))
     }
