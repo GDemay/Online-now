@@ -31,6 +31,7 @@ struct OnlineNowPrimaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .frame(minWidth: 44, minHeight: 44)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .foregroundStyle(.white)
