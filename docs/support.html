@@ -208,22 +208,22 @@
 
             <div class="faq-item">
                 <p class="faq-question">How accurate is the speed test?</p>
-                <p class="faq-answer">The speed test provides a general indication of your download speed. For the most accurate results, close other apps and ensure you're not actively downloading or streaming content. Results may vary based on server distance and current network conditions.</p>
+                <p class="faq-answer">Test Speed starts a single-server download estimate using up to 10 MB. The estimate includes connection setup time and depends on the server and current network conditions. Downloads run only when you choose Test Speed.</p>
             </div>
 
             <div class="faq-item">
                 <p class="faq-question">Does the app use a lot of battery?</p>
-                <p class="faq-answer">No. Online Now uses Apple's efficient Network framework which is optimized for minimal battery consumption. The app only actively monitors when in the foreground and uses system callbacks rather than constant polling.</p>
+                <p class="faq-answer">OnlineNow monitors only while it is in the foreground. It observes network changes and checks internet access periodically, about every 30 seconds. Monitoring and in-flight checks stop when the app enters the background; speed downloads require Test Speed.</p>
             </div>
 
             <div class="faq-item">
                 <p class="faq-question">How do I delete my connection history?</p>
-                <p class="faq-answer">Your connection history is stored locally on your device. You can clear it through the app's history view, or simply delete and reinstall the app to remove all data.</p>
+                <p class="faq-answer">The newest 100 checks are stored locally. Open History to export them as CSV or use Clear History to delete them after confirmation. Deleting history does not require reinstalling the app.</p>
             </div>
 
             <div class="faq-item">
                 <p class="faq-question">Why doesn't VPN detection always work?</p>
-                <p class="faq-answer">VPN detection depends on how your VPN provider implements their connection. Most VPNs are detected through standard interface names, but some custom implementations may not be recognized. If you notice your VPN isn't being detected, please report it to us.</p>
+                <p class="faq-answer">The app looks for interface names commonly used by tunnels. Some VPNs may be missed, and other tunnels may be reported as a possible VPN. This estimate does not verify that traffic is protected; check your VPN app for its connection status.</p>
             </div>
 
             <div class="faq-item">
@@ -244,7 +244,6 @@
                     <li>iOS 17.0 or later</li>
                     <li>iPhone or iPad</li>
                     <li>Network connection (WiFi or Cellular)</li>
-                    <li>Approximately 10 MB of storage</li>
                 </ul>
             </div>
 

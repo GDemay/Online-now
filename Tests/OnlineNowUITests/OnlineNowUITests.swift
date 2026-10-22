@@ -1,14 +1,32 @@
 import Foundation
+import StoreKit
 import XCTest
 import StoreKitTest
 
 final class OnlineNowUITests: XCTestCase {
     private var app: XCUIApplication!
+    private var storeKitSession: SKTestSession?
 
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--offline"]
+    }
+
+    override func tearDownWithError() throws {
+        // Tear down the app before resetting the process-wide StoreKit service.
+        // XCTest still calls this if an assertion stops a test before approval.
+        app?.terminate()
+        if let store = storeKitSession {
+            for transaction in store.allTransactions() where transaction.state == .deferred {
+                try? store.declineAskToBuyTransaction(identifier: transaction.identifier)
+            }
+            store.clearTransactions()
+            store.resetToDefaultState()
+        }
+        storeKitSession = nil
+        app = nil
+        try super.tearDownWithError()
     }
 
     func testOfflineRefreshAndHistoryNavigation() throws {
@@ -27,15 +45,16 @@ final class OnlineNowUITests: XCTestCase {
 
     func testDonationPurchaseAndRepeatedTip() throws {
         let store = try SKTestSession(configurationFileNamed: "Configuration")
+        storeKitSession = store
         store.resetToDefaultState()
         store.disableDialogs = true
         store.clearTransactions()
-        defer { store.clearTransactions(); store.resetToDefaultState() }
         app.launch()
         app.buttons["navigation.tipJar"].tap()
         let purchase = app.buttons["tipJar.purchase"]
         XCTAssertTrue(purchase.waitForExistence(timeout: 15))
         XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        let initialTipCount = try recordedTipCount()
         purchase.tap()
         let thanks = app.alerts["Thank you!"]
         XCTAssertTrue(thanks.waitForExistence(timeout: 15))
@@ -51,7 +70,54 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(purchase.waitForExistence(timeout: 10))
         XCTAssertTrue(purchase.isEnabled)
         XCTAssertEqual(store.allTransactions().count, 2)
+        XCTAssertTrue(waitForRecordedTipCount(initialTipCount + 2, timeout: 10))
         attachScreenshot(named: "Online Now - Tip jar after repeat tips", exportForReview: true)
+    }
+
+    func testAskToBuyApprovalIsDeliveredOnce() throws {
+        let store = try SKTestSession(configurationFileNamed: "Configuration")
+        storeKitSession = store
+        store.resetToDefaultState()
+        store.disableDialogs = true
+        store.askToBuyEnabled = true
+        store.clearTransactions()
+        app.launch()
+        app.buttons["navigation.tipJar"].tap()
+        let purchase = app.buttons["tipJar.purchase"]
+        XCTAssertTrue(purchase.waitForExistence(timeout: 15))
+        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        let initialTipCount = try recordedTipCount()
+        purchase.tap()
+
+        var deferredTransaction: SKTestTransaction?
+        XCTAssertTrue(waitUntil(timeout: 15) {
+            deferredTransaction = store.allTransactions().first { $0.state == .deferred }
+            return deferredTransaction != nil
+        }, "The app purchase did not create an actual Ask to Buy transaction")
+        let pendingTransaction = try XCTUnwrap(deferredTransaction)
+        let pendingMessage = app.staticTexts["tipJar.pending"]
+        XCTAssertTrue(pendingMessage.waitForExistence(timeout: 10))
+        XCTAssertFalse(purchase.isEnabled, "Pending approval must block another purchase")
+        XCTAssertFalse(app.alerts["Thank you!"].exists)
+        XCTAssertEqual(try recordedTipCount(), initialTipCount, "Pending purchases must not grant support")
+        XCTAssertEqual(store.allTransactions().count, 1, "The disabled action must not create another request")
+
+        try store.approveAskToBuyTransaction(identifier: pendingTransaction.identifier)
+        XCTAssertTrue(waitForRecordedTipCount(initialTipCount + 1, timeout: 15))
+        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        XCTAssertFalse(pendingMessage.exists)
+        XCTAssertEqual(store.allTransactions().count, 1)
+
+        app.terminate()
+        app.launch()
+        app.buttons["navigation.tipJar"].tap()
+        XCTAssertTrue(purchase.waitForExistence(timeout: 15))
+        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        XCTAssertTrue(waitForRecordedTipCount(initialTipCount + 1, timeout: 10),
+                      "Approval must persist exactly one tip across an app restart")
+        XCTAssertFalse(pendingMessage.exists)
+        XCTAssertEqual(store.allTransactions().count, 1)
+        attachScreenshot(named: "Online Now - Approved Ask to Buy")
     }
 
     func testLargeTextNavigation() throws {
@@ -62,6 +128,27 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(history.isHittable)
         history.tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
+    }
+
+    private var supportSummary: XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "tipJar.support").firstMatch
+    }
+
+    private func recordedTipCount() throws -> Int {
+        guard supportSummary.exists else { return 0 }
+        return try XCTUnwrap(Int(supportSummary.value as? String ?? ""),
+                             "The support summary must expose its recorded tip count")
+    }
+
+    private func waitForRecordedTipCount(_ count: Int, timeout: TimeInterval) -> Bool {
+        waitUntil(timeout: timeout) {
+            self.supportSummary.exists && Int(self.supportSummary.value as? String ?? "") == count
+        }
+    }
+
+    private func waitUntil(timeout: TimeInterval, _ condition: @escaping () -> Bool) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in condition() }, object: nil)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
     /// Keep a normal test attachment and optionally export the same unmodified PNG.

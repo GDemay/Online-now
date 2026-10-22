@@ -56,6 +56,8 @@ public struct TipJarView: View {
                         }
                         .multilineTextAlignment(.center)
                         .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("tipJar.support")
+                        .accessibilityValue("\(tippingManager.tipCount)")
                     }
                 }
                 .padding(24)
