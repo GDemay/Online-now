@@ -1,7 +1,6 @@
 name: iOS verification
+# Verify release branches before shipping; the legacy default branch has no app test scheme.
 on:
-  push:
-    branches: [main, 'fix/**']
   pull_request:
   workflow_dispatch:
 permissions:
