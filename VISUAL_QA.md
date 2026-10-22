@@ -51,3 +51,18 @@ A Debug-only, explicitly flagged error diagnostic exposes only error type/domain
 through accessibility during review; it never records accounts, URLs, or payloads. No App Store
 metadata, pending submission, or production signing configuration is changed by
 this QA worktree.
+
+
+## Follow-up capture corrections
+
+The final visual scheme selects six payment, dark-mode, and exceptional-state cases.
+It uses the production SwiftUI purchase context and History contrast correction;
+only explicit Debug diagnostic/display hooks differ. StoreKit fixtures warm-launch
+and terminate the offline app before configuration so a fresh simulator registers
+the tested bundle. The native checkout cancellation test taps the actual system
+`dismiss` control and verifies no credit or payment error. Fault injection labelled
+userCancelled was observed to throw StoreKitError.unknown, so it is diagnostic
+failure evidence and is never counted as actual cancellation.
+
+Original full-device screenshots use XCUIScreen.main.screenshot(). Defective old
+landscape app-window captures are excluded; PNG bytes are never repaired or edited.

@@ -456,11 +456,6 @@ final class OnlineNowVisualReviewTests: XCTestCase {
 
     @MainActor
     func testVisualTipFailureAndRecovery() async throws {
-        // Register the freshly installed app with the simulator StoreKit service
-        // before configuring fault injection. A never-launched app returns nil.
-        launch(scenario: "offline")
-        require(app.buttons["connectivity.refresh"])
-        app.terminate()
         let session = try configureStore()
         let simulatedFailure = SKTestFailures.Purchase.generic(.unknown)
         try await session.setSimulatedError(simulatedFailure, forAPI: .purchase)
@@ -496,11 +491,6 @@ final class OnlineNowVisualReviewTests: XCTestCase {
 
     @MainActor
     func testVisualTipCancellation() async throws {
-        // Register the freshly installed app with the simulator StoreKit service
-        // before configuring fault injection. A never-launched app returns nil.
-        launch(scenario: "offline")
-        require(app.buttons["connectivity.refresh"])
-        app.terminate()
         let session = try configureStore()
         let cancellation = SKTestFailures.Purchase.generic(.userCancelled)
         try await session.setSimulatedError(cancellation, forAPI: .purchase)
@@ -829,6 +819,11 @@ final class OnlineNowVisualReviewTests: XCTestCase {
     }
 
     private func configureStore() throws -> SKTestSession {
+        // A fresh test-only simulator must launch the app once before StoreKit
+        // can save configuration or fault overrides for its registered bundle.
+        launch(scenario: "offline")
+        require(app.buttons["connectivity.refresh"])
+        app.terminate()
         let session = try SKTestSession(configurationFileNamed: "Configuration")
         store = session
         session.resetToDefaultState()

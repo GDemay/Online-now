@@ -10,6 +10,86 @@ import XCTest
 @available(iOS 17.0, macOS 14.0, *)
 @MainActor
 final class TippingStoreKitTests: XCTestCase {
+    func testInjectedPurchaseCancellationDoesNotCreditSupportOrShowFailure() async throws {
+        try await withLocalProduct { product, manager, session in
+            var calls = 0
+            manager.errorMessage = "An earlier payment failed"
+            let cancelled = await manager.purchase(product, performPurchase: { requested in
+                calls += 1
+                XCTAssertEqual(requested.id, product.id)
+                XCTAssertTrue(manager.isPurchasing)
+                return .userCancelled
+            })
+            XCTAssertFalse(cancelled)
+            XCTAssertNil(manager.errorMessage)
+            XCTAssertFalse(manager.isPurchasing)
+            XCTAssertFalse(manager.isPending)
+            XCTAssertEqual(manager.tipCount, 0)
+
+            let thrownCancellation = await manager.purchase(product, performPurchase: { requested in
+                calls += 1
+                XCTAssertEqual(requested.id, product.id)
+                throw StoreKitError.userCancelled
+            })
+            XCTAssertFalse(thrownCancellation)
+            XCTAssertNil(manager.errorMessage)
+            XCTAssertFalse(manager.isPurchasing)
+            XCTAssertFalse(manager.isPending)
+            XCTAssertEqual(manager.tipCount, 0)
+            XCTAssertEqual(calls, 2)
+            XCTAssertTrue(session.allTransactions().isEmpty)
+        }
+    }
+
+    func testInjectedPendingPurchaseBlocksAnotherPurchaseWithoutCreditingSupport() async throws {
+        try await withLocalProduct { product, manager, session in
+            var calls = 0
+            let pending = await manager.purchase(product, performPurchase: { requested in
+                calls += 1
+                XCTAssertEqual(requested.id, product.id)
+                return .pending
+            })
+            XCTAssertFalse(pending)
+            XCTAssertTrue(manager.isPending)
+            XCTAssertFalse(manager.isPurchasing)
+            XCTAssertNil(manager.errorMessage)
+            XCTAssertEqual(manager.tipCount, 0)
+            let repeated = await manager.purchase(product, performPurchase: { _ in
+                calls += 1
+                return .userCancelled
+            })
+            XCTAssertFalse(repeated)
+            XCTAssertEqual(calls, 1, "Pending approval must prevent another purchase action")
+            XCTAssertTrue(session.allTransactions().isEmpty)
+        }
+    }
+
+    func testInjectedUnknownFailureRemainsVisibleAndNextAttemptCanProceed() async throws {
+        try await withLocalProduct { product, manager, session in
+            var calls = 0
+            let failed = await manager.purchase(product, performPurchase: { requested in
+                calls += 1
+                XCTAssertEqual(requested.id, product.id)
+                throw StoreKitError.unknown
+            })
+            XCTAssertFalse(failed)
+            XCTAssertNotNil(manager.errorMessage, "An unknown store error must remain a visible failure")
+            XCTAssertFalse(manager.isPurchasing)
+            XCTAssertFalse(manager.isPending)
+            XCTAssertEqual(manager.tipCount, 0)
+            let retry = await manager.purchase(product, performPurchase: { _ in
+                calls += 1
+                return .userCancelled
+            })
+            XCTAssertFalse(retry)
+            XCTAssertNil(manager.errorMessage)
+            XCTAssertFalse(manager.isPurchasing)
+            XCTAssertEqual(manager.tipCount, 0)
+            XCTAssertEqual(calls, 2)
+            XCTAssertTrue(session.allTransactions().isEmpty)
+        }
+    }
+
     func testRepeatConsumableTransactionsAndUnfinishedRecovery() async throws {
         executionTimeAllowance = 60
         let session = try SKTestSession(configurationFileNamed: "Configuration")
@@ -110,6 +190,24 @@ final class TippingStoreKitTests: XCTestCase {
         XCTAssertTrue(finished, "Both consumables must finish after their recorded support is saved")
         let restarted = TippingManager(defaults: defaults, startsStoreKit: false)
         XCTAssertEqual(restarted.tipCount, 2, "Recovered and live transactions must persist exactly once")
+    }
+
+    private func withLocalProduct(
+        _ test: @MainActor (Product, TippingManager, SKTestSession) async throws -> Void
+    ) async throws {
+        let session = try SKTestSession(configurationFileNamed: "Configuration")
+        session.resetToDefaultState()
+        session.disableDialogs = true
+        session.clearTransactions()
+        defer { session.clearTransactions(); session.resetToDefaultState() }
+        let suite = "OnlineNow.PurchaseActionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let products = try await Product.products(for: ["onlinenow.gdemay"])
+        let product = try XCTUnwrap(products.first { $0.id == "onlinenow.gdemay" })
+        XCTAssertEqual(product.type, .consumable)
+        let manager = TippingManager(defaults: defaults, startsStoreKit: false)
+        try await test(product, manager, session)
     }
 
     private func waitUntil(timeout: TimeInterval, _ condition: () async -> Bool) async throws -> Bool {

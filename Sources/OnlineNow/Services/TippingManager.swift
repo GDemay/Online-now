@@ -10,7 +10,6 @@ public final class TippingManager: ObservableObject {
     @Published public private(set) var isLoading = false
     @Published public var errorMessage: String?
     #if DEBUG
-    /// Sanitized error metadata exists only for explicitly opted-in native QA.
     @Published private(set) var visualReviewErrorDiagnostics: String?
     #endif
     @Published public private(set) var isPurchasing = false
@@ -83,6 +82,22 @@ public final class TippingManager: ObservableObject {
     }
 
     public func loadProducts() async {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("--ui-testing"), args.contains("--visual-review") {
+            // Rendering fixtures only; purchase workflow tests use a real SKTestSession.
+            if args.contains("--tip-loading") {
+                isLoading = true
+                return
+            }
+            if args.contains("--tip-unavailable") {
+                products = []
+                isLoading = false
+                errorMessage = "We couldn’t connect to the App Store. Check your connection and try again."
+                return
+            }
+        }
+        #endif
         guard !isLoading, !isPurchasing else { return }
         guard ledgerIsReadable else { return }
         isLoading = true
@@ -104,6 +119,15 @@ public final class TippingManager: ObservableObject {
 
     /// Returns true only after a verified tip has been saved locally and finished.
     public func purchase(_ product: Product) async -> Bool {
+        await purchase(product, performPurchase: { try await $0.purchase() })
+    }
+
+    /// The view supplies its scene-aware StoreKit action. Accounting, verified
+    /// delivery, pending state, and error handling stay in this manager.
+    func purchase(
+        _ product: Product,
+        performPurchase: @MainActor (Product) async throws -> Product.PurchaseResult
+    ) async -> Bool {
         guard !isPurchasing, !isPending, ledgerIsReadable else { return false }
         guard Self.productIDs.contains(product.id), product.type == .consumable else {
             errorMessage = "This tip option is unavailable. Please reload the tip jar."
@@ -116,7 +140,7 @@ public final class TippingManager: ObservableObject {
         #endif
         defer { isPurchasing = false }
         do {
-            switch try await product.purchase() {
+            switch try await performPurchase(product) {
             case .success(let result):
                 return await process(result)
             case .userCancelled:
