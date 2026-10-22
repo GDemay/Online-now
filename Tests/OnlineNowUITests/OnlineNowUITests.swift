@@ -584,14 +584,31 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         tap("connectivity.speed")
         require(app.buttons["Done"])
         capture("ax5-speed-detail-top")
-        scrollTo(app.staticTexts["Benchmarks"], maximumSwipes: 16)
+        let plot = identified("statDetail.plot")
+        require(plot)
+        scrollTo(plot, maximumSwipes: 20)
+        capture("ax5-speed-detail-history-chart")
+        scrollTo(identified("statDetail.benchmarks"), maximumSwipes: 20)
         capture("ax5-speed-detail-benchmarks")
         app.buttons["Done"].tap()
         tap("navigation.history")
         require(app.buttons["history.export"])
         capture("ax5-history-overview")
-        scrollTo(app.staticTexts["Recent Checks"], maximumSwipes: 16)
+        let averageSpeed = identified("history.averageSpeed")
+        require(averageSpeed)
+        scrollTo(averageSpeed, maximumSwipes: 20)
+        capture("ax5-history-average-speed")
+        let record = identified("history.record")
+        scrollTo(record, maximumSwipes: 20)
+        require(record)
         capture("ax5-history-records")
+        let measuredRecord = app.descendants(matching: .any)
+            .matching(identifier: "history.record")
+            .matching(NSPredicate(format: "label CONTAINS %@", "Speed:"))
+            .firstMatch
+        scrollTo(measuredRecord, maximumSwipes: 20)
+        require(measuredRecord)
+        capture("ax5-history-record-with-speed")
         app.buttons["Done"].tap()
         tap("navigation.tipJar")
         require(app.buttons["tipJar.purchase"], timeout: 15)
@@ -724,10 +741,18 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         app.buttons["Done"].tap()
 
         tap("navigation.tipJar")
+        capture("landscape-tip-jar-initial")
+        require(app.buttons["tipJar.close"])
         let purchase = app.buttons["tipJar.purchase"]
+        // Short landscape viewports may not expose the product in accessibility
+        // until its scroll content has been brought into view.
+        scrollTo(purchase, maximumSwipes: 16)
+        capture("landscape-tip-jar-after-scroll")
+        let unavailable = app.staticTexts["tipJar.unavailable"].exists
+        let loading = identified("tipJar.loading").exists
+        print("ONLINE_NOW_VISUAL_OBSERVATION landscape-tip-after-scroll purchase-exists=\(purchase.exists) unavailable=\(unavailable) loading=\(loading)")
         require(purchase, timeout: 15)
         XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
-        scrollTo(purchase)
         XCTAssertTrue(purchase.isHittable)
         XCTAssertTrue(app.buttons["tipJar.close"].isHittable)
         capture("landscape-tip-jar-purchase")
@@ -798,7 +823,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
     /// the still-present Home scroll view underneath a modal on iPad.
     private var activeScrollView: XCUIElement? {
         app.scrollViews.allElementsBoundByIndex.last {
-            $0.exists && $0.isHittable && !$0.frame.intersection(app.frame).isEmpty
+            $0.exists && !$0.frame.intersection(app.frame).isEmpty
         }
     }
 
@@ -819,11 +844,23 @@ final class OnlineNowVisualReviewTests: XCTestCase {
 
     private func scrollTo(_ element: XCUIElement, maximumSwipes: Int = 16,
                           towardsTopWhenMissing: Bool = false) {
-        for _ in 0..<maximumSwipes {
+        var previousFrame: CGRect?
+        var stationaryDrags = 0
+        for attempt in 0..<maximumSwipes {
             let scroll = activeScrollView
             let viewport = visibleViewport(for: scroll)
             let exists = element.exists
             let frame = exists ? element.frame : .zero
+            if attempt == 0 {
+                print("ONLINE_NOW_SCROLL_GEOMETRY app=\(app.frame) viewport=\(viewport) scroll=\(String(describing: scroll?.frame)) target=\(frame)")
+            }
+            if exists, let previousFrame, abs(frame.minY - previousFrame.minY) < 2 { stationaryDrags += 1 }
+            else { stationaryDrags = 0 }
+            if stationaryDrags >= 2 {
+                print("ONLINE_NOW_SCROLL_OBSERVATION stationary-after=\(attempt) target=\(frame) viewport=\(viewport)")
+                return
+            }
+            previousFrame = exists ? frame : nil
             if exists, !frame.isEmpty {
                 if frame.height <= viewport.height,
                    viewport.contains(CGPoint(x: frame.midX, y: frame.minY)),
@@ -874,7 +911,9 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         }
         // Settle short SwiftUI transitions without blocking the app process.
         Thread.sleep(forTimeInterval: 0.5)
-        let screenshot = app.screenshot()
+        // Capture the native display directly. XCUIApplication.screenshot() can
+        // crop a landscape app into a square before applying orientation.
+        let screenshot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = "Online Now - Visual review - \(name)"
         attachment.lifetime = .keepAlways
