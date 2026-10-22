@@ -43,6 +43,35 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(refresh.waitForExistence(timeout: 5))
     }
 
+    /// Captures the unmodified release UI using the existing empty, offline test store.
+    /// This method is selected only by the isolated App Store screenshot scheme.
+    func testMarketingScreenshots() throws {
+        app.launch()
+        let refresh = app.buttons["connectivity.refresh"]
+        XCTAssertTrue(refresh.waitForExistence(timeout: 10))
+        XCTAssertTrue(refresh.waitForEnabled(timeout: 10))
+        XCTAssertTrue(app.buttons["navigation.history"].exists)
+        attachMarketingScreenshot(named: "home")
+
+        let details = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Cloudflare HTTPS")).firstMatch
+        let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Connection Quality")).firstMatch
+        XCTAssertTrue(details.exists)
+        XCTAssertTrue(quality.exists)
+        let scroll = app.scrollViews.firstMatch
+        for _ in 0..<3 where !quality.isHittable {
+            scroll.swipeUp()
+        }
+        XCTAssertTrue(details.isHittable)
+        XCTAssertTrue(quality.isHittable)
+        attachMarketingScreenshot(named: "network-details")
+
+        app.buttons["navigation.history"].tap()
+        XCTAssertTrue(app.otherElements["history.empty"].waitForExistence(timeout: 5)
+                      || app.staticTexts["history.empty"].exists)
+        XCTAssertTrue(app.buttons["Done"].exists)
+        attachMarketingScreenshot(named: "history")
+    }
+
     func testDonationPurchaseAndRepeatedTip() throws {
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
@@ -149,6 +178,42 @@ final class OnlineNowUITests: XCTestCase {
     private func waitUntil(timeout: TimeInterval, _ condition: @escaping () -> Bool) -> Bool {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in condition() }, object: nil)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func attachMarketingScreenshot(named name: String) {
+        guard app.launchArguments.contains("--ui-testing"),
+              app.launchArguments.contains("--offline") else {
+            XCTFail("Marketing capture requires the isolated offline UI fixture.")
+            return
+        }
+        let capture = app.screenshot()
+        let attachment = XCTAttachment(screenshot: capture)
+        attachment.name = "Online Now - App Store - \(name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        let png = capture.pngRepresentation
+        guard png.starts(with: [137, 80, 78, 71, 13, 10, 26, 10]) else {
+            XCTFail("The native screenshot did not contain PNG data.")
+            return
+        }
+        let environment = ProcessInfo.processInfo.environment
+        func slug(_ value: String) -> String {
+            value.unicodeScalars.map { CharacterSet.alphanumerics.contains($0) ? String($0) : "-" }.joined()
+        }
+        let model = slug(environment["SIMULATOR_MODEL_IDENTIFIER"] ?? "unknown")
+        let device = slug(environment["SIMULATOR_DEVICE_NAME"] ?? model)
+        let encoded = png.base64EncodedData()
+        let chunkSize = 4_000
+        let chunkCount = (encoded.count + chunkSize - 1) / chunkSize
+        let identifier = UUID().uuidString
+        print("ONLINE_NOW_MARKETING_SCREENSHOT_BEGIN id=\(identifier) name=\(name) device=\(device) bytes=\(png.count) chunks=\(chunkCount) model=\(model)")
+        for (index, start) in stride(from: 0, to: encoded.count, by: chunkSize).enumerated() {
+            let end = min(start + chunkSize, encoded.count)
+            let chunk = String(decoding: encoded[start..<end], as: UTF8.self)
+            print("ONLINE_NOW_MARKETING_SCREENSHOT_CHUNK id=\(identifier) index=\(index) data=\(chunk)")
+        }
+        print("ONLINE_NOW_MARKETING_SCREENSHOT_END id=\(identifier)")
     }
 
     /// Keep a normal test attachment and optionally export the same unmodified PNG.
