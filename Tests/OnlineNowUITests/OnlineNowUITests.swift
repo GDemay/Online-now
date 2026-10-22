@@ -269,6 +269,79 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         capture("online-recent-activity")
     }
 
+    /// One current-palette portrait pass for the gallery's core product views.
+    func testVisualFinalPortraitOverview() throws {
+        _ = try configureStore()
+        launch(scenario: "online", seeded: true)
+        waitForReady()
+        requireViewport(textContaining("You're Online"), context: "portrait-online-status")
+        requireViewport(app.buttons["connectivity.refresh"], context: "portrait-online-refresh")
+        capture("online-home")
+
+        // Align small headings near the top so their entire vertical section,
+        // rather than only the heading itself, appears in the same capture.
+        func alignHeadingToTop(_ element: XCUIElement) {
+            scrollTo(element)
+            for _ in 0..<4 {
+                guard element.exists else { return }
+                let viewport = visibleViewport(for: activeScrollView)
+                let delta = element.frame.minY - (viewport.minY + 32)
+                guard abs(delta) > 8 else { return }
+                let step = min(viewport.height * 0.3, max(24, abs(delta)))
+                let upwards = delta > 0
+                let startY = viewport.midY + (upwards ? step / 2 : -step / 2)
+                let endY = viewport.midY - (upwards ? step / 2 : -step / 2)
+                let origin = app.coordinate(withNormalizedOffset: .zero)
+                let x = viewport.minX + viewport.width * 0.9
+                let start = origin.withOffset(CGVector(dx: x - app.frame.minX, dy: startY - app.frame.minY))
+                let end = origin.withOffset(CGVector(dx: x - app.frame.minX, dy: endY - app.frame.minY))
+                start.press(forDuration: 0.03, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.1)
+                Thread.sleep(forTimeInterval: 0.2)
+            }
+        }
+
+        let networkHeading = textContaining("Network Details")
+        let networkBottom = textContaining("Last Updated")
+        scrollTo(networkBottom)
+        alignHeadingToTop(networkHeading)
+        requireViewport(networkHeading, context: "portrait-network-heading")
+        requireViewport(networkBottom, context: "portrait-network-bottom")
+        capture("online-network-details")
+        let recent = app.buttons["connectivity.recentActivity"]
+        scrollTo(recent)
+        capture("online-recent-activity", showing: recent)
+
+        tap("navigation.history")
+        require(app.buttons["history.export"])
+        let average = identified("history.averageSpeed")
+        scrollTo(average)
+        let overviewHeading = textContaining("Saved Checks Overview")
+        alignHeadingToTop(overviewHeading)
+        requireViewport(overviewHeading, context: "portrait-history-overview-heading")
+        requireViewport(average, context: "portrait-history-average-speed")
+        capture("history-populated-overview")
+        let measured = measuredHistoryRecord
+        scrollTo(measured)
+        capture("history-populated-records", showing: measured)
+        app.buttons["Done"].tap()
+
+        tap("navigation.tipJar")
+        let purchase = app.buttons["tipJar.purchase"]
+        require(purchase, timeout: 15)
+        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        scrollTo(purchase)
+        capture("tip-jar-product", showing: purchase)
+        let initialCount = recordedTipCount()
+        purchase.tap()
+        let thanks = app.alerts["Thank you!"]
+        require(thanks, timeout: 15)
+        capture("tip-purchase-thank-you")
+        thanks.buttons["Done"].tap()
+        XCTAssertTrue(waitUntil(10) { self.recordedTipCount() == initialCount + 1 })
+        scrollTo(supportSummary)
+        capture("tip-jar-recorded-support", showing: supportSummary)
+    }
+
     func testVisualAllStatDetails() throws {
         launch(scenario: "online", seeded: true)
         waitForReady()
