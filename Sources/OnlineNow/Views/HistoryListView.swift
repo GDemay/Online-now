@@ -129,7 +129,7 @@ public struct HistoryListView: View {
 
                 Text("Your connectivity checks will appear here")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
             }
         }
@@ -167,7 +167,7 @@ public struct HistoryListView: View {
         return VStack(alignment: .leading, spacing: 12) {
             Text("Saved Checks Overview")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .padding(.leading, 4)
 
             // Main stats row
@@ -202,7 +202,7 @@ public struct HistoryListView: View {
             }
             Text("Showing the latest \(visibleCount) \(visibleNoun). Summary and export include \(stats.totalChecks) saved \(savedNoun), up to 100.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .fixedSize(horizontal: false, vertical: true)
 
             // Average speed if available
@@ -218,7 +218,7 @@ public struct HistoryListView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Average Speed", systemImage: "speedometer")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                         .fixedSize(horizontal: false, vertical: true)
                     averageSpeedValue(speed)
                     speedQualityBadge(speed)
@@ -233,7 +233,7 @@ public struct HistoryListView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Average Speed")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.primary.opacity(0.75))
                         averageSpeedValue(speed)
                     }
                     Spacer()
@@ -256,7 +256,7 @@ public struct HistoryListView: View {
                     .font(.system(.title2, design: .rounded, weight: .bold))
                 Text("Mbps")
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
             }
             .fixedSize(horizontal: false, vertical: true)
         } else {
@@ -265,7 +265,7 @@ public struct HistoryListView: View {
                     .font(.system(.title2, design: .rounded, weight: .bold))
                 Text("Mbps")
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
             }
         }
     }
@@ -301,7 +301,7 @@ public struct HistoryListView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recent Checks")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .padding(.leading, 4)
 
             LazyVStack(spacing: 1) {
@@ -380,7 +380,7 @@ struct HistoryStatCard: View {
 
             Text(title)
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
@@ -432,7 +432,7 @@ struct HistoryRowView: View {
 
                     Text(check.connectionType)
                         .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
 
                     if check.isVPNActive {
                         Image(systemName: "lock.shield.fill")
@@ -473,7 +473,7 @@ struct HistoryRowView: View {
             }
             Text(check.connectionType)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
             if check.isVPNActive {
                 Label("Possible VPN", systemImage: "lock.shield.fill")
                     .font(.caption)
@@ -484,7 +484,7 @@ struct HistoryRowView: View {
                 Text(check.timestamp, format: .dateTime.hour().minute())
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.primary.opacity(0.75))
             if let speed = check.speedMbps {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(formatSpeed(speed))
@@ -492,7 +492,7 @@ struct HistoryRowView: View {
                         .monospacedDigit()
                     Text("Mbps")
                         .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
         }
