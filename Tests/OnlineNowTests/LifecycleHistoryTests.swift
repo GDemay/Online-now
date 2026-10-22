@@ -11,8 +11,10 @@ final class LifecycleHistoryTests: XCTestCase {
         let container = try ModelContainer(for: schema, configurations: [
             ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         ])
+        container.mainContext.autosaveEnabled = false
         let history = HistoryManager()
         history.configure(with: container.mainContext)
+        XCTAssertNil(history.errorMessage)
         return (history, container)
     }
 
@@ -25,7 +27,21 @@ final class LifecycleHistoryTests: XCTestCase {
                 isConnected: index >= 30, connectionType: "WiFi", isReachable: index >= 50,
                 speedMbps: index >= 50 ? 50 : nil
             ))
+            XCTAssertNil(history.errorMessage, "Saving check \(index) must succeed")
+            if [0, 99, 100, 104].contains(index) {
+                // A fresh context sees only committed rows, not pending inserts in
+                // the manager's context. Cover below, at, and above the limit.
+                let reader = ModelContext(container)
+                XCTAssertEqual(try reader.fetchCount(FetchDescriptor<ConnectivityCheck>()),
+                               min(index + 1, 100), "Stored count after check \(index)")
+            }
         }
+        let reader = ModelContext(container)
+        let stored = try reader.fetch(FetchDescriptor<ConnectivityCheck>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        ))
+        XCTAssertEqual(stored.map(\.timestamp),
+                       (5..<105).reversed().map { Date(timeIntervalSince1970: Double($0)) })
         let statistics = history.getStatistics()
         XCTAssertEqual(history.recentChecks.count, 20)
         XCTAssertEqual(statistics.totalChecks, 100)
@@ -35,8 +51,11 @@ final class LifecycleHistoryTests: XCTestCase {
         XCTAssertEqual(statistics.averageSpeedMbps, 50)
         XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<ConnectivityCheck>()), 100)
         XCTAssertTrue(history.clearHistory())
+        XCTAssertNil(history.errorMessage)
         XCTAssertEqual(history.getStatistics().totalChecks, 0)
         XCTAssertNil(history.lastCheck)
+        let clearedReader = ModelContext(container)
+        XCTAssertEqual(try clearedReader.fetchCount(FetchDescriptor<ConnectivityCheck>()), 0)
     }
 
     func testHistoryKeepsDistinctTCPAndHTTPTimingsAndEscapesCSV() throws {
@@ -48,14 +67,46 @@ final class LifecycleHistoryTests: XCTestCase {
                 rttMs: 12, responseTimeMs: 55, errorMessage: "=test, \"quoted\"\nnext"
             )
         }
-        XCTAssertEqual(history.lastCheck?.rttMs, 12)
-        XCTAssertEqual(history.lastCheck?.responseTimeMs, 55)
-        XCTAssertEqual(history.lastCheck?.measurementMethod, "TCP")
+        XCTAssertNil(history.errorMessage)
+        let reader = ModelContext(container)
+        let stored = try reader.fetch(FetchDescriptor<ConnectivityCheck>())
+        XCTAssertEqual(stored.count, 1, "The first saved check must survive retention pruning")
+        let saved = try XCTUnwrap(stored.first)
+        XCTAssertEqual(history.lastCheck?.id, saved.id)
+        XCTAssertEqual(saved.rttMs, 12)
+        XCTAssertEqual(saved.responseTimeMs, 55)
+        XCTAssertEqual(saved.measurementMethod, "TCP")
         let csv = try history.exportCSV()
+        XCTAssertNil(history.errorMessage)
         XCTAssertTrue(csv.contains("tcp_rtt_ms,http_response_ms"))
         XCTAssertTrue(csv.contains("\"limited\""))
         XCTAssertTrue(csv.contains("\"12.0\",\"55.0\""))
         XCTAssertTrue(csv.contains("\"'=test, \"\"quoted\"\"\nnext\""))
+    }
+
+    func testUnconfiguredHistoryReportsFailureAndRecoversAfterConfiguration() throws {
+        let history = HistoryManager()
+        let check = ConnectivityCheck(isConnected: true, connectionType: "WiFi", isReachable: true)
+        history.saveCheck(check)
+        XCTAssertNotNil(history.errorMessage)
+        XCTAssertNil(history.lastCheck)
+        XCTAssertThrowsError(try history.exportCSV())
+        XCTAssertNotNil(history.errorMessage)
+
+        let schema = Schema([ConnectivityCheck.self])
+        let container = try ModelContainer(for: schema, configurations: [
+            ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        ])
+        defer { withExtendedLifetime(container) {} }
+        container.mainContext.autosaveEnabled = false
+        history.configure(with: container.mainContext)
+        XCTAssertNil(history.errorMessage)
+        history.saveCheck(check)
+        XCTAssertNil(history.errorMessage)
+        let reader = ModelContext(container)
+        let stored = try reader.fetch(FetchDescriptor<ConnectivityCheck>())
+        XCTAssertEqual(stored.map(\.id), [check.id])
+        XCTAssertEqual(history.lastCheck?.id, check.id)
     }
 
     func testCompletedManualCheckLeavesBusyStateAndSpeedIsExplicit() async {

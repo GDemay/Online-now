@@ -68,9 +68,9 @@ asc xcode-cloud workflows view --id "$WORKFLOW_ID" --output json
 asc xcode-cloud workflows repository --id "$WORKFLOW_ID" --output json
 ```
 
-The existing `Default` workflow has been observed to trigger for `main`; a candidate branch push alone does not establish that a build started. Merge the prepared candidate with its native test gate into `main`, then identify that exact commit's run. The workflow must use this repository and the shared `OnlineNow` scheme. In Xcode Cloud's workflow settings, verify:
+The existing `Default` workflow has been observed to trigger for `main`; a candidate branch push alone does not establish that a build started. Merge the prepared candidate into `main`, then identify that exact commit's run. The workflow must use this repository and the shared `OnlineNow` scheme. In Xcode Cloud's workflow settings, verify:
 
-- A Test action runs `OnlineNowTests` and `OnlineNowUITests` on an available iOS simulator, or the repository's post-build test gate executes those tests and fails the build on any failure. Passing only Build or Analyze does not run these tests. Preserve the test gate's `.xcresult` and console summary when tests are invoked by a script instead of a native workflow Test action.
+- The required `Test - iOS` action runs `OnlineNowTests` and `OnlineNowUITests` on the configured iPhone simulator. Passing only Archive or Analyze does not run these tests. Native Test actions retain results and screenshots; the old archive post-build test script was removed after the Test action was configured.
 - An Archive action uses Release configuration, the existing production team, and App Store distribution signing.
 - Distribution uploads an App Store eligible build to App Store Connect. A build limited to internal TestFlight testing cannot be attached to an App Store release.
 - The candidate branch is selectable, and the archive carries version `1.2.0` with an unused build number.
@@ -100,7 +100,7 @@ For each Test action ID from the actions response:
 asc xcode-cloud test-results list --action-id "$TEST_ACTION_ID" --paginate --output json
 ```
 
-Require actual passing unit, StoreKit, and UI test results from the workflow Test actions or the repository's test gate, plus successful archive/distribution. An empty Test action list is not test evidence. Inspect retained screenshots and `.xcresult` artifacts for failures. `--doctor` mode is useful for diagnosis but can report a failed build with exit code zero; do not use that mode as the release success gate.
+Require actual passing unit, StoreKit, and UI test results from the required workflow Test action, plus successful archive/distribution. An empty Test action list is not test evidence. Inspect retained screenshots and `.xcresult` artifacts for failures. `--doctor` mode is useful for diagnosis but can report a failed build with exit code zero; do not use that mode as the release success gate.
 
 The local StoreKit catalog checks accounting and the purchase UI. Before submission, test the real App Store Connect sandbox catalog on a development build with local StoreKit configuration disabled, or in TestFlight, including product lookup, purchase, cancellation, and repeated tips. Follow [TIPPING_SETUP_GUIDE.md](TIPPING_SETUP_GUIDE.md). TestFlight sandbox purchases do not charge real money.
 

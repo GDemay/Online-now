@@ -20,14 +20,24 @@ public final class HistoryManager: ObservableObject {
     }
 
     public func saveCheck(_ check: ConnectivityCheck) {
-        guard let context = modelContext else { return }
+        guard let context = modelContext else {
+            errorMessage = HistoryError.notConfigured.localizedDescription
+            return
+        }
         context.insert(check)
         do {
-            var descriptor = FetchDescriptor<ConnectivityCheck>(
-                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-            )
-            descriptor.fetchOffset = maxHistoryCount
-            for oldCheck in try context.fetch(descriptor) { context.delete(oldCheck) }
+            // SwiftData merges pending inserts into fetch results separately from the
+            // persistent-store offset. An offset fetch can therefore return a new,
+            // unsaved check even when there are fewer than 100 rows and delete it.
+            // Fetch the complete bounded working set and apply retention in memory.
+            var checks = try context.fetch(FetchDescriptor<ConnectivityCheck>())
+            if !checks.contains(where: { $0 === check }) { checks.append(check) }
+            checks.sort {
+                if $0.timestamp != $1.timestamp { return $0.timestamp > $1.timestamp }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+            for oldCheck in checks.dropFirst(maxHistoryCount) { context.delete(oldCheck) }
+            // Insertion and pruning commit together; a failed save rolls both back.
             try context.save()
             errorMessage = nil
             fetchRecentChecks()

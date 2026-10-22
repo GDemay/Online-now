@@ -84,3 +84,33 @@ samples, not elapsed uptime. History retains 100 checks. Consumable support
 history is local; reinstalling does not restore finished consumables. An Ask to
 Buy approval clears pending state through transaction updates; after a decline,
 reopen the app to retry because StoreKit emits no consumable transaction update.
+
+## Native and App Store investigation — 22 October 2026
+
+App Store Connect authentication now works through an app-specific CLI wrapper
+outside the repository. The live version is 1.1; a 1.2.0 draft is being prepared
+with release after Apple approval. No API private key is stored in this repository.
+
+Xcode Cloud build 12 compiled the application and native test targets using
+Xcode 27.1 / iOS 27.0. Its first test run had 49 passing cases, 7 intentionally
+skipped live-network cases, 2 failing history cases and 1 deferred-purchase timeout.
+All three UI cases passed, including two consumable purchases and large text.
+
+The history failures exposed SwiftData's handling of pending inserts in offset
+fetches: pruning could delete a newly inserted check. Retention now selects the
+newest 100 records explicitly without a paginated fetch, with independent-context
+persistence checks. Ask-to-Buy testing now approves the actual deferred
+transaction before awaiting purchase completion. These fixes require the next
+native run to establish that they pass.
+
+The Default Xcode Cloud workflow now includes a first-class required Test action,
+using the shared OnlineNow scheme on an iPhone simulator. The redundant archive
+post-build test script has been removed; native test artifacts can be retrieved
+through App Store Connect instead of being discarded with a custom script's
+temporary workspace. The existing signed Archive action is preserved.
+
+The live consumable onlinenow.gdemay existed but was MISSING_METADATA, with no
+localization or review screenshot and no approved IAP version. An en-GB
+localization and review instructions were added while preserving the existing
+price and 175-territory availability. A genuine native tip-jar screenshot and
+review submission with the app are still required at this checkpoint.

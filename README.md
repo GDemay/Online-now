@@ -23,9 +23,10 @@ checks and can be exported as CSV. All features work without tipping.
 
 ## Verify
 
-The `iOS verification` GitHub Actions workflow builds and runs app, StoreKit, and
-UI tests on macOS, then checks the Swift package. Test artifacts include an
-`.xcresult` bundle and build log. To run locally on a Mac:
+The existing Xcode Cloud Default workflow archives `main` and runs the required
+`Test - iOS` action for app, StoreKit, and UI tests. Results are available through
+App Store Connect. The optional `iOS verification` GitHub Actions workflow also
+checks the Swift package when Actions is enabled. To run locally on a Mac:
 
 ```sh
 xcrun simctl list devices available

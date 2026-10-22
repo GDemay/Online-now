@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 import StoreKitTest
 
@@ -19,9 +20,7 @@ final class OnlineNowUITests: XCTestCase {
         app.buttons["navigation.history"].tap()
         XCTAssertTrue(app.otherElements["history.empty"].waitForExistence(timeout: 5)
                       || app.staticTexts["history.empty"].exists)
-        let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.lifetime = .keepAlways
-        add(screenshot)
+        attachScreenshot(named: "Online Now - Empty history")
         app.buttons["Done"].tap()
         XCTAssertTrue(refresh.waitForExistence(timeout: 5))
     }
@@ -52,9 +51,7 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(purchase.waitForExistence(timeout: 10))
         XCTAssertTrue(purchase.isEnabled)
         XCTAssertEqual(store.allTransactions().count, 2)
-        let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.lifetime = .keepAlways
-        add(screenshot)
+        attachScreenshot(named: "Online Now - Tip jar after repeat tips", exportForReview: true)
     }
 
     func testLargeTextNavigation() throws {
@@ -65,6 +62,41 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(history.isHittable)
         history.tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
+    }
+
+    /// Keep a normal test attachment and optionally export the same unmodified PNG.
+    /// The numbered chunks survive Xcode Cloud's downloadable script/test logs,
+    /// including when custom-script-created xcresult bundles are not retained.
+    private func attachScreenshot(named name: String, exportForReview: Bool = false) {
+        let capture = app.screenshot()
+        let attachment = XCTAttachment(screenshot: capture)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        guard exportForReview else { return }
+        guard app.launchArguments.contains("--ui-testing"),
+              app.launchArguments.contains("--offline") else {
+            XCTFail("Review screenshots may only be exported from the isolated offline UI fixture.")
+            return
+        }
+
+        let png = capture.pngRepresentation
+        guard png.starts(with: [137, 80, 78, 71, 13, 10, 26, 10]) else {
+            XCTFail("The native screenshot did not contain PNG data.")
+            return
+        }
+        let encoded = png.base64EncodedData()
+        let chunkSize = 4_000
+        let chunkCount = (encoded.count + chunkSize - 1) / chunkSize
+        let identifier = UUID().uuidString
+        print("ONLINE_NOW_REVIEW_SCREENSHOT_BEGIN id=\(identifier) bytes=\(png.count) chunks=\(chunkCount)")
+        for (index, start) in stride(from: 0, to: encoded.count, by: chunkSize).enumerated() {
+            let end = min(start + chunkSize, encoded.count)
+            let chunk = String(decoding: encoded[start..<end], as: UTF8.self)
+            print("ONLINE_NOW_REVIEW_SCREENSHOT_CHUNK id=\(identifier) index=\(index) data=\(chunk)")
+        }
+        print("ONLINE_NOW_REVIEW_SCREENSHOT_END id=\(identifier)")
     }
 }
 
