@@ -15,6 +15,16 @@ struct OnlineNowApp: App {
         #endif
     }
 
+    private var visualReviewColorScheme: ColorScheme? {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("--ui-testing"), args.contains("--visual-review"), args.contains("--dark-mode") {
+            return .dark
+        }
+        #endif
+        return nil
+    }
+
     var body: some Scene {
         WindowGroup {
             if isUnitTestHost {
@@ -24,6 +34,7 @@ struct OnlineNowApp: App {
             } else if let container = storage.container {
                 ConnectivityStatusView()
                     .modelContainer(container)
+                    .preferredColorScheme(visualReviewColorScheme)
                     .safeAreaInset(edge: .bottom) {
                         if storage.isTemporary {
                             VStack(spacing: 4) {
@@ -63,10 +74,37 @@ private struct HistoryStorage {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--ui-testing")
             || ProcessInfo.processInfo.arguments.contains("--unit-testing") {
+            let args = ProcessInfo.processInfo.arguments
+            let isVisualReview = args.contains("--ui-testing") && args.contains("--visual-review")
+            if isVisualReview, args.contains("--history-open-failure") {
+                return HistoryStorage(container: nil, isTemporary: false)
+            }
+            let container = try? ModelContainer(for: schema, configurations: [
+                ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            ])
+            if isVisualReview, args.contains("--seed-history"), let container {
+                let context = ModelContext(container)
+                let reference = Date()
+                for index in 0..<6 {
+                    let connected = index != 2
+                    let reachable = connected && index != 1
+                    let speed: Double? = reachable ? [72.0, 48.5, 12.2, 4.8][index % 4] : nil
+                    context.insert(ConnectivityCheck(
+                        timestamp: reference.addingTimeInterval(-Double(index + 1) * 90),
+                        isConnected: connected,
+                        connectionType: !connected ? "None" : (index == 3 ? "Cellular" : "WiFi"),
+                        isReachable: reachable, speedMbps: speed,
+                        rttMs: reachable ? Double(18 + index * 9) : nil,
+                        responseTimeMs: reachable ? Double(35 + index * 15) : nil,
+                        isVPNActive: index == 4,
+                        errorMessage: index == 1 ? "Internet unreachable" : nil
+                    ))
+                }
+                try? context.save()
+            }
             return HistoryStorage(
-                container: try? ModelContainer(for: schema, configurations: [
-                    ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-                ]), isTemporary: false
+                container: container,
+                isTemporary: isVisualReview && args.contains("--temporary-history")
             )
         }
         #endif

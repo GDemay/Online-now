@@ -183,6 +183,18 @@ public final class ConnectivityViewModel: ObservableObject {
     private var checkTask: Task<Void, Never>?
     private var operationID = UUID()
     private var usesOfflineFixture = false
+    #if DEBUG
+    private var visualReviewScenario: String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("--ui-testing"), args.contains("--visual-review"),
+              !args.contains("--live-network") else { return nil }
+        if args.contains("--offline") { return "offline" }
+        if args.contains("--scenario-limited") { return "limited" }
+        if args.contains("--scenario-checking") { return "checking" }
+        if args.contains("--scenario-speed-error") { return "speed-error" }
+        return "online"
+    }
+    #endif
     @Published public private(set) var isMonitoring = false
     @Published public private(set) var isPerformingCheck = false
     @Published public private(set) var isPerformingSpeedTest = false
@@ -213,6 +225,9 @@ public final class ConnectivityViewModel: ObservableObject {
         usesOfflineFixture = ProcessInfo.processInfo.arguments.contains("--ui-testing")
             && ProcessInfo.processInfo.arguments.contains("--offline")
         #endif
+        #if DEBUG
+        configureVisualReviewFixtures()
+        #endif
         setupNetworkMonitorObservation()
         historyManager.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -221,6 +236,36 @@ public final class ConnectivityViewModel: ObservableObject {
             self?.objectWillChange.send()
         }.store(in: &cancellables)
     }
+
+    #if DEBUG
+    /// Isolated QA uses the real check pipeline and views with deterministic service responses.
+    /// This is available only when BOTH explicit UI-test and visual-review flags are present.
+    private func configureVisualReviewFixtures() {
+        guard let scenario = visualReviewScenario else { return }
+        reachabilityCheck = {
+            try? await Task.sleep(nanoseconds: scenario == "checking" ? 20_000_000_000 : 150_000_000)
+            return ReachabilityResult(
+                isReachable: scenario != "limited", responseTimeMs: 42,
+                error: scenario == "limited" ? "Network connected, but the internet could not be reached." : nil
+            )
+        }
+        latencyMeasurement = { LatencyResult(rttMs: 18, method: .tcp, endpoint: "QA fixture", error: nil) }
+        endpointCheck = { _ in scenario != "limited" }
+        speedMeasurement = {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if scenario == "speed-error" {
+                return SpeedTestResult(speedMbps: nil, bytesDownloaded: 0, durationSeconds: 3,
+                                       error: "The speed test could not finish. Check your connection and try again.")
+            }
+            return SpeedTestResult(speedMbps: 72, bytesDownloaded: 27_000_000, durationSeconds: 3, error: nil)
+        }
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("--tip-prompt") {
+            tippingManager.tipPromptTrigger = .frequentUser
+            tippingManager.shouldShowTipPrompt = true
+        }
+    }
+    #endif
 
     deinit {
         reachabilityTimer?.invalidate()
@@ -232,6 +277,23 @@ public final class ConnectivityViewModel: ObservableObject {
         guard !isMonitoring, !isPreviewMode else { return }
         isMonitoring = true
         state = .checking
+        #if DEBUG
+        if let scenario = visualReviewScenario {
+            let args = ProcessInfo.processInfo.arguments
+            applyNetworkSnapshot(NetworkPathSnapshot(
+                isConnected: scenario != "offline", connectionType: scenario == "offline" ? .none : .wifi,
+                isVPNActive: args.contains("--possible-vpn"),
+                isConstrained: args.contains("--low-data-mode"), isExpensive: args.contains("--metered")
+            ), automaticallyCheck: false)
+            if scenario != "offline" {
+                checkTask = Task { [weak self] in
+                    guard let self else { return }
+                    await self.performCheck()
+                }
+            }
+            return
+        }
+        #endif
         if usesOfflineFixture {
             applyNetworkSnapshot(NetworkPathSnapshot(
                 isConnected: false, connectionType: .none, isVPNActive: false,

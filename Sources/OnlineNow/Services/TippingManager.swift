@@ -79,6 +79,22 @@ public final class TippingManager: ObservableObject {
     }
 
     public func loadProducts() async {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("--ui-testing"), args.contains("--visual-review") {
+            // Rendering fixtures only; purchase workflow tests use a real SKTestSession.
+            if args.contains("--tip-loading") {
+                isLoading = true
+                return
+            }
+            if args.contains("--tip-unavailable") {
+                products = []
+                isLoading = false
+                errorMessage = "We couldn’t connect to the App Store. Check your connection and try again."
+                return
+            }
+        }
+        #endif
         guard !isLoading, !isPurchasing else { return }
         guard ledgerIsReadable else { return }
         isLoading = true

@@ -566,6 +566,7 @@ public struct ConnectivityStatusView: View {
             "Recent activity: \(check.isReachable ? "Online" : (check.isConnected ? "Limited connectivity" : "Offline")), \(viewModel.historyManager.timeSinceLastCheck() ?? "")"
         )
         .accessibilityHint("Tap to view full history")
+        .accessibilityIdentifier("connectivity.recentActivity")
     }
 
     // MARK: - Network Info Card
