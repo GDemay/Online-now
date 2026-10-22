@@ -30,6 +30,13 @@ older passing/uploaded builds do not establish the latest source is verified.
 Account-backed sandbox catalog/purchase readiness and Paid Apps Agreement status
 remain UNKNOWN; local StoreKit testing does not establish those account checks.
 
+PR #6 is merged. Its first required main run (42) passed Archive and all five UI
+cases, but a local StoreKit fixture-readiness assertion failed: 64 passed,
+seven intentional skips and one failure. The test helper is corrected to retain
+its first successful receipt observation; production recovery assertions and
+application code are unchanged. Build 42 was not selected. A fresh exact-source
+required main Archive/Test pass remains the release gate.
+
 Historical **1.2.0 (17)**, source
 `86f8f6d60f3f12c181c1b4512f2635f39b201a1e`, was submitted on 22 October 2026 and
 rejected under Guideline 2.1(b) for an In-App Purchase issue. Its submission remains

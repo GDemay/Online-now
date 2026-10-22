@@ -28,6 +28,8 @@ Current follow-up gates (22 October checkpoint):
 - Uploaded build 33 is VALID but contains older colors. It remains unattached; rejected build 17 is still bound to the version and no replacement has been resubmitted. Do not attach build 33 or upload Candidate 40 in place of the exact final main build.
 - **Paid Apps Agreement status and account-backed sandbox payment readiness remain UNKNOWN.** The owner must inspect Business agreement status and verify a real-storefront sandbox catalog/purchase with local StoreKit disabled. Fresh-simulator probe 21 returned no products and no storefront; that does not establish an inactive agreement. No legal agreement has been accepted or changed.
 
+**Main run 42 follow-up:** PR #6 is merged at `1d84bad580250bb48a6b1c871852428881d462b9`. Archive succeeded, but Test reported 64 passed, seven intentional skips and one fixture-readiness failure; all five UI cases passed. The recovery fixture failed in 0.335 seconds because its polling helper sampled the asynchronous predicate again after success. The helper now preserves its first successful observation, with production recovery and finish assertions retained. Application code is unchanged. Do not select build 42; require a fresh exact-source main Archive/Test pass and stage that build instead.
+
 Commands below were checked against `asc 5.16.0` help. The CLI's maintained upstream is [rorkai/App-Store-Connect-CLI](https://github.com/rorkai/App-Store-Connect-CLI), which the former `rudrankriyam` repository redirects to. Install a verified executable and put `asc` on `PATH`; a workspace-specific executable or wrapper path is not required.
 
 ## 1. Configure the smallest sufficient API access
