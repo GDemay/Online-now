@@ -273,10 +273,10 @@ public struct HistoryListView: View {
     private func speedQualityBadge(_ speed: Double) -> some View {
         Text(speedQuality(speed))
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(speedQualityColor(speed), in: Capsule())
+            .background(speedQualityColor(speed).opacity(0.15), in: Capsule())
     }
 
     private func speedQuality(_ speed: Double) -> String {

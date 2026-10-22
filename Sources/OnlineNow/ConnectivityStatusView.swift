@@ -304,33 +304,38 @@ public struct ConnectivityStatusView: View {
     // MARK: - Hero Section
 
     private func heroSection(geometry: GeometryProxy) -> some View {
-        VStack(spacing: 16) {
+        let compact = geometry.size.height < 430 && geometry.size.width > geometry.size.height
+        let logoSize = min(geometry.size.width * 0.5, compact ? 64 : 200)
+
+        return VStack(spacing: compact ? 8 : 16) {
             // Logo
             ZStack {
                 if viewModel.state == .checking || viewModel.state == .measuringSpeed
                     || viewModel.state == .idle
                 {
-                    LoadingRingView(size: min(geometry.size.width * 0.5, 200))
+                    LoadingRingView(size: logoSize)
                 } else {
                     LogoView(
-                        size: min(geometry.size.width * 0.5, 200),
+                        size: logoSize,
                         isAnimating: false,
                         isOnline: viewModel.state == .online
                     )
                 }
             }
-            .frame(height: min(geometry.size.width * 0.5, 200))
+            .frame(height: logoSize)
             .accessibilityHidden(true)
 
             // App title
-            Text("Online Now")
-                .font(.system(.title2, design: .rounded, weight: .bold))
-                .foregroundStyle(.primary)
+            if !compact {
+                Text("Online Now")
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                    .foregroundStyle(.primary)
+            }
 
             // Status text
             VStack(spacing: 8) {
                 Text(statusTitle)
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(.system(compact ? .title2 : .largeTitle, design: .rounded, weight: .bold))
                     .foregroundStyle(statusTitleColor)
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.4), value: viewModel.state)
@@ -344,7 +349,7 @@ public struct ConnectivityStatusView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityStatusLabel)
         }
-        .padding(.top, 20)
+        .padding(.top, compact ? 8 : 20)
         .padding(.bottom, 8)
     }
 
