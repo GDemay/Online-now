@@ -199,7 +199,7 @@ public struct ConnectivityStatusView: View {
             }
             Text("Speed tests download data and use your current Wi-Fi or mobile plan. They run only when you choose Test Speed.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .fixedSize(horizontal: false, vertical: true)
 
             if let error = viewModel.errorMessage {
@@ -235,7 +235,7 @@ public struct ConnectivityStatusView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 44)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(OnlineNowPrimaryButtonStyle())
         .disabled(isBusy || !viewModel.isConnected || viewModel.isPreviewMode)
         .accessibilityIdentifier("connectivity.speedTest")
         .accessibilityHint("Downloads test data to measure your connection speed")
@@ -342,7 +342,7 @@ public struct ConnectivityStatusView: View {
 
                 Text(statusSubtitle)
                     .font(.body.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
             }
             .padding(.horizontal)
@@ -506,12 +506,12 @@ public struct ConnectivityStatusView: View {
             headerLayout {
                 Label("Recent Activity", systemImage: "clock")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                 if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 16) }
                 if let timeAgo = viewModel.historyManager.timeSinceLastCheck() {
                     Text(timeAgo)
                         .font(.footnote.weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
 
@@ -545,7 +545,7 @@ public struct ConnectivityStatusView: View {
                     detailLayout {
                         Text(check.connectionType)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.primary.opacity(0.75))
 
                         if let speed = check.speedMbps {
                             if !dynamicTypeSize.isAccessibilitySize {
@@ -553,7 +553,7 @@ public struct ConnectivityStatusView: View {
                             }
                             Text(String(format: "%.1f Mbps", speed))
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.primary.opacity(0.75))
                         }
 
                         if check.isVPNActive {
@@ -594,7 +594,7 @@ public struct ConnectivityStatusView: View {
         VStack(alignment: .leading, spacing: 16) {
             Label("Network Details", systemImage: "info.circle")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
 
             VStack(spacing: 12) {
                 NetworkInfoRow(
@@ -618,7 +618,7 @@ public struct ConnectivityStatusView: View {
                     icon: "g.circle.fill",
                     label: "Google",
                     value: endpointStatus(viewModel.isGoogleReachable),
-                    valueColor: viewModel.isGoogleReachable ? .green : .secondary
+                    valueColor: viewModel.isGoogleReachable ? .green : Color.primary.opacity(0.75)
                 )
 
                 Divider()
@@ -627,7 +627,7 @@ public struct ConnectivityStatusView: View {
                     icon: "server.rack",
                     label: "Cloudflare HTTPS",
                     value: endpointStatus(viewModel.isCloudflareReachable),
-                    valueColor: viewModel.isCloudflareReachable ? .green : .secondary
+                    valueColor: viewModel.isCloudflareReachable ? .green : Color.primary.opacity(0.75)
                 )
 
                 Divider()
@@ -674,7 +674,7 @@ public struct ConnectivityStatusView: View {
                         icon: "clock.arrow.circlepath",
                         label: "Last Updated",
                         value: formatTime(lastCheck),
-                        valueColor: .secondary
+                        valueColor: Color.primary.opacity(0.75)
                     )
                 }
             }
@@ -755,13 +755,13 @@ struct MiniStatCard: View {
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
 
             Text(title)
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -867,12 +867,12 @@ struct NetworkInfoRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .frame(width: 24)
                 .accessibilityHidden(true)
             Text(label)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

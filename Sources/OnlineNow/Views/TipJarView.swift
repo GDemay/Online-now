@@ -27,7 +27,7 @@ public struct TipJarView: View {
                             .font(.title.bold())
                             .accessibilityAddTraits(.isHeader)
                         Text("An optional tip helps keep the app maintained. Every feature stays free, whether you tip or not.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.primary.opacity(0.75))
                     }
                     .multilineTextAlignment(.center)
 
@@ -49,10 +49,10 @@ public struct TipJarView: View {
                                 .font(.headline)
                             Text("\(tippingManager.tipCount) tip\(tippingManager.tipCount == 1 ? "" : "s") recorded on this device")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.primary.opacity(0.75))
                             Text("Consumable tips cannot be restored after reinstalling the app.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.primary.opacity(0.75))
                         }
                         .multilineTextAlignment(.center)
                         .accessibilityElement(children: .combine)
@@ -102,7 +102,7 @@ public struct TipJarView: View {
                 Label("Waiting for approval", systemImage: "clock")
                     .font(.headline)
                 Text("The App Store is waiting for approval. Your support will appear here when the purchase is confirmed.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier("tipJar.pending")
             }
@@ -116,7 +116,7 @@ public struct TipJarView: View {
                     .font(.headline)
                     .accessibilityIdentifier("tipJar.unavailable")
                 Text(tippingManager.errorMessage ?? "Check your connection and try again. All app features remain free.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
                 retryButton
             } else {
@@ -212,7 +212,7 @@ private struct TipOptionCard: View {
             }
             .padding(18)
             .foregroundStyle(.white)
-            .background(Color.blue)
+            .background(OnlineNowColors.actionFill)
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
