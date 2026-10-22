@@ -121,6 +121,14 @@ public final class TippingManager: ObservableObject {
                 errorMessage = "The App Store hasn’t confirmed this tip. Please try again later."
                 return false
             }
+        } catch StoreKitError.userCancelled {
+            // StoreKit may deliver cancellation as either a result or an error.
+            // Neither is a failed payment or a reason to show an error message.
+            return false
+        } catch let error as SKError where error.code == .paymentCancelled {
+            return false
+        } catch is CancellationError {
+            return false
         } catch {
             errorMessage = "Your tip couldn’t be completed. Please try again."
             return false

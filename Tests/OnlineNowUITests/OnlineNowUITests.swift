@@ -127,6 +127,29 @@ final class OnlineNowUITests: XCTestCase {
         attachScreenshot(named: "Online Now - Approved Ask to Buy")
     }
 
+    func testCancelledTipDoesNotShowFailureOrCreditSupport() async throws {
+        let store = try SKTestSession(configurationFileNamed: "Configuration")
+        storeKitSession = store
+        store.resetToDefaultState()
+        store.disableDialogs = true
+        store.clearTransactions()
+        try await store.setSimulatedError(SKTestFailures.Purchase.generic(.userCancelled), forAPI: .purchase)
+        app.launch()
+        app.buttons["navigation.tipJar"].tap()
+        let purchase = app.buttons["tipJar.purchase"]
+        XCTAssertTrue(purchase.waitForExistence(timeout: 15))
+        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        let initialTipCount = try recordedTipCount()
+        purchase.tap()
+        XCTAssertFalse(app.staticTexts["tipJar.error"].waitForExistence(timeout: 2),
+                       "Choosing to cancel a tip must not be presented as a payment failure")
+        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        XCTAssertEqual(try recordedTipCount(), initialTipCount)
+        XCTAssertFalse(app.alerts["Thank you!"].exists)
+        try await store.setSimulatedError(nil, forAPI: .purchase)
+        attachScreenshot(named: "Online Now - Cancelled tip remains available")
+    }
+
     func testLargeTextNavigation() throws {
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
