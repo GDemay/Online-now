@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last Updated: October 20, 2026
+Last Updated: October 22, 2026
 
 ## Introduction
 
@@ -8,9 +8,9 @@ Online Now ("the App", "we", "our", or "us") is committed to protecting your pri
 
 Online Now keeps connection history and tip confirmations on your device. We do not operate an analytics or advertising service. Network checks and App Store purchases contact the providers described below.
 
-## Information We Do NOT Collect
+## Information the Developer Does Not Receive
 
-We want to be completely transparent: Online Now does not collect any personal information. Specifically, we do NOT collect:
+Online Now has no user accounts, advertising, or analytics service. We do not receive the following information through the app; requests to connectivity providers and Apple are described separately below:
 
 - Personal identification information (name, email, phone number)
 - Location data
@@ -34,19 +34,20 @@ Connection results are displayed and saved locally. To verify internet access, t
 
 The App stores your connection history locally on your device using Apple's SwiftData framework. This data:
 
-- Is not uploaded by the app; you can choose to export and share a CSV file
-- Is not accessible to us or any third party
-- Can be deleted at any time through the app or by deleting the app
+- Is stored locally and is not automatically shared with the developer
+- Can be exported and shared by you as a CSV file
+- Can be cleared in History or removed by deleting the app
 - May be included in device backups according to your Apple backup settings
 
 ## Third-Party Services
 
-Online Now does NOT use any third-party services for:
+The App does not include third-party integrations for:
 
 - Analytics or crash reporting
 - Advertising or marketing
 - Social media integration
-- Any form of data collection or tracking
+
+Connectivity providers and Apple receive requests as described in this policy.
 
 ## Network Requests
 
@@ -63,7 +64,7 @@ Apple handles optional consumable purchases through the App Store under its own 
 
 ## Children's Privacy
 
-Our App does not collect any personal information from anyone, including children under 13. The App is safe for use by people of all ages.
+Online Now has no user accounts, advertising, or analytics service. Connectivity checks and optional purchases still contact the providers described above.
 
 ## Changes to This Policy
 
@@ -78,6 +79,6 @@ If you have any questions about this Privacy Policy or our privacy practices, pl
 
 ## Your Rights
 
-Since we don't collect any personal data, there is no personal data to access, modify, or delete. You have complete control over any local data stored on your device through the app's settings or by uninstalling the app.
+Use Clear History in the app's History view to delete saved connection checks. Deleting the app removes its local data. Manage device backups in your Apple backup settings. Apple handles App Store purchase data under its own terms.
 
 © 2026 GDemay. All rights reserved.
