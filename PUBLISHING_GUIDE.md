@@ -2,17 +2,31 @@
 
 This updates the existing app; do not create another App Store Connect app or change its bundle identifier.
 
-**Current status, 22 October 2026:** Apple accepted submission `dbdb1c40-2d72-4b31-9cbe-d68d393ccc18` at `2026-10-22T16:12:10.53Z`. App version 1.2.0 and its first consumable are both `WAITING_FOR_REVIEW`, with release policy `AFTER_APPROVAL`. **1.2.0 is not live.** Monitor this submission; do not upload, stage, or submit it again. Mutation examples below apply only to a future editable candidate.
+**Current status, 22 October 2026:** Apple accepted submission `dbdb1c40-2d72-4b31-9cbe-d68d393ccc18` at `2026-10-22T16:12:10.53Z`, then rejected app version 1.2.0 (17) under **Guideline 2.1(b) for an In-App Purchase issue**. The submission is `UNRESOLVED_ISSUES`; its app item is `REJECTED` and consumable item is `READY_FOR_REVIEW`. **1.2.0 is not live.** `AFTER_APPROVAL` remains configured but cannot publish a rejected version. Resolve the issue and verify the next candidate before resubmitting; inspect existing resources before any write to avoid duplicate submissions.
 
 | Item | Expected value |
 | --- | --- |
 | App Store Connect app ID | `6758242393` |
 | Bundle identifier | `com.gdemay.onlinenow` |
 | Production developer team | `GB87Z9SKC5` |
-| Current published version | `1.1` — 1.2.0 is awaiting review |
+| Current published version | `1.1` — 1.2.0 (17) was rejected |
 | Submitted version/build | `1.2.0` / `17` |
 | Verified binary source | `86f8f6d60f3f12c181c1b4512f2635f39b201a1e` |
 | Consumable tip product ID | `onlinenow.gdemay` |
+| Latest intended app source | `d258c6c60886ef181881e27e3f4789c98d88fb2b`, PR #6 |
+| Uploaded staging build | 1.2.0 (33), VALID, older palette; unattached and not resubmitted |
+| Latest required native pass | Candidate 40, exact source `12f5bfb57b4d13f899f2ae88155f64a93dbaaae3`, 65 passed / seven intentional skips / zero failures |
+| Final gates | Palette QA 41 passed; require Default Archive/Test on the merged `main` commit and inspect that exact build |
+
+Apple's 17:49:25 UTC notification reports IAP bugs on iPad Air 11-inch (M3), iPadOS 27.0.1, with active internet, but gives no precise error or screenshot. It explicitly states that **unapproved IAP products can function in the review sandbox**. Do not interpret the missing approval as the failure's cause.
+
+Current follow-up gates (22 October checkpoint):
+
+- Candidate 40 (`8e1ad725-bd74-478f-bd16-172a318d2a68`) completed required Archive/Test on exact source `12f5bfb57b4d13f899f2ae88155f64a93dbaaae3`: 65 passed, seven intentional live-network skips, zero failures, all five UI cases passed. It was not uploaded. Latest source `d258c6c60886ef181881e27e3f4789c98d88fb2b` adds final color-only corrections verified by QA 41. Merge authorized PR #6, require both Default actions on the resulting `main` SHA, and select only that exact current archive. No future main result is claimed here.
+- Scene-aware SwiftUI `PurchaseAction` uses the presenting scene, with the library's iOS 15/macOS 12 fallback. Actual local StoreKit checkout X/dismiss, no additional tip credit on cancellation, repeated consumables, Ask-to-Buy and failure/recovery passed on phone and iPad. Earlier injected cancellation faults delivered typed `StoreKitError.unknown`; unknown errors remain visible. Local StoreKit is separate from an account-backed sandbox purchase.
+- QA 39 (`fddb5648-e738-4bc4-8ae1-91a656f3de64`, source `d61be7a3ee5ebbd9b06145cd57dd09a6a61407c3`) passed four cases on both devices (eight outcomes), with 80 original PNGs reviewed. Detail axes are readable without overlap; native Charts may hide the right endpoint label. **Focused palette QA 41** (`e84f816b-e918-4af1-af22-666aaa0bd43a`, QA source `a1d1cdcb0e812184d44c8cb73e2ccd9b9d494545`, matching production Release `d258c6c60886ef181881e27e3f4789c98d88fb2b`) completed successfully at 22:33:09 UTC: two outcomes, all 24 original PNGs reviewed, no new layout defect observed. All 38 measured contrast samples passed, including light/dark headings and enabled Refresh/retry/prompt controls.
+- Uploaded build 33 is VALID but contains older colors. It remains unattached; rejected build 17 is still bound to the version and no replacement has been resubmitted. Do not attach build 33 or upload Candidate 40 in place of the exact final main build.
+- **Paid Apps Agreement status and account-backed sandbox payment readiness remain UNKNOWN.** The owner must inspect Business agreement status and verify a real-storefront sandbox catalog/purchase with local StoreKit disabled. Fresh-simulator probe 21 returned no products and no storefront; that does not establish an inactive agreement. No legal agreement has been accepted or changed.
 
 Commands below were checked against `asc 5.16.0` help. The CLI's maintained upstream is [rorkai/App-Store-Connect-CLI](https://github.com/rorkai/App-Store-Connect-CLI), which the former `rudrankriyam` repository redirects to. Install a verified executable and put `asc` on `PATH`; a workspace-specific executable or wrapper path is not required.
 
@@ -83,7 +97,8 @@ Existing Xcode Cloud signing and Archive actions build and sign remotely. If Clo
 
 ## 3. Run the candidate and inspect the results
 
-Build 17 passed its required native Xcode Cloud Archive and Test actions: **53 passed, seven intentionally skipped live-network tests, zero failures; all four UI tests passed**. These results apply to source `86f8f6d60f3f12c181c1b4512f2635f39b201a1e`. Preserve that SHA when recording later documentation changes.
+Build 17 historically passed on source `86f8f6d60f3f12c181c1b4512f2635f39b201a1e`: 53 passed, seven intentionally skipped, zero failures. Candidate 40 passed both required actions on `12f5bfb57b4d13f899f2ae88155f64a93dbaaae3`: 65 passed, seven intentional skips, zero failures. These results remain source-specific. QA 41 visually verified final colors in Release-equivalent `d258c6c60886ef181881e27e3f4789c98d88fb2b`; the required Default Archive/Test on the merged main commit is still necessary. Record that actual result externally without requiring a documentation-only commit/rebuild cycle to certify itself. Native success does not prove account-backed App Store payments.
+
 
 The existing push-triggered workflow can run after the candidate is merged to `main`, without an API key. If an explicit run is needed after authentication, identify the configured workflow ID and the merged source commit first:
 
@@ -112,7 +127,7 @@ The local StoreKit catalog checks accounting and the purchase UI; it does not pr
 
 ## 4. Stage the processed build and metadata
 
-Version 1.2.0 build 17 is already uploaded, processed, attached, and submitted. Inspect its existing resources without restaging them:
+Version 1.2.0 build 17 remains attached and rejected. Older-palette build 33 is uploaded and VALID but must remain unattached. Candidate 40 was not uploaded. After the final merged-main Archive/Test passes, inspect that exact archive, upload it once if needed, and verify its processed resource and eligibility before attaching it. Do not substitute a passing older build:
 
 ```bash
 asc builds list --app 6758242393 --platform IOS --version 1.2.0 --processing-state all --paginate --output json
@@ -141,7 +156,7 @@ asc review doctor --app 6758242393 --version-id "$NEXT_VERSION_ID" --output json
 
 Use only locale codes returned by the API. Check app privacy, regulations/permits declarations, export compliance, review contact details, screenshots, and paid-app agreements in App Store Connect where the public API does not expose a complete check. Only the Account Holder can accept the Paid Applications Agreement; banking/tax prerequisites remain separate from this CLI workflow.
 
-**Privacy URL retention:** the current App Store `privacyPolicyUrl` is [PRIVACY.md on `release/privacy-1.2.0`](https://github.com/GDemay/Online-now/blob/release/privacy-1.2.0/PRIVACY.md), published at commit `d6b4d70`. **Retain branch `release/privacy-1.2.0` indefinitely while this metadata URL uses it.** Verify a replacement is public and update App Store metadata before retiring the branch. GitHub Pages source has been corrected, but deployment run `39804752290` is queued during Actions degradation; the fallback privacy page is already public and must remain available.
+**Privacy URL retention:** the current App Store `privacyPolicyUrl` is [PRIVACY.md on `release/privacy-1.2.0`](https://github.com/GDemay/Online-now/blob/release/privacy-1.2.0/PRIVACY.md), published at commit `d6b4d70`. **Retain branch `release/privacy-1.2.0` indefinitely while this metadata URL uses it.** Verify a replacement is public and update App Store metadata before retiring the branch. GitHub Pages source has been corrected, but deployment run `39804752290` remains queued and old placeholder content still serves HTTP 200. Verify actual deployed copy before cleanup; HTTP success alone does not prove the corrected site is live. The public GitHub fallback privacy page must remain available.
 
 If the donation product needs review, inspect its resource and version IDs:
 
@@ -154,12 +169,15 @@ Require the intended consumable product and completed metadata/pricing/availabil
 
 ## 5. Submit for review, then publish after approval
 
-For the current release, monitor the already accepted unified submission:
+For the current release, inspect the existing rejected/unresolved unified submission and its items:
 
 ```bash
 asc submit status --id dbdb1c40-2d72-4b31-9cbe-d68d393ccc18 --output json
 asc review status --app 6758242393 --version 1.2.0 --output json
+asc review items-list --submission dbdb1c40-2d72-4b31-9cbe-d68d393ccc18 --include appStoreVersion,inAppPurchaseVersion --paginate --output json
 ```
+
+Resolve the specific review issue before marking an item resolved or resubmitting. Preserve the first consumable in the same intended app submission; read back the exact item IDs and states. Apple offered a bug-fix review exception or a corrected resubmission, but no exception has been requested and no replacement has been submitted at this checkpoint. Do not mark the issue resolved solely because local StoreKit tests or metadata validation pass.
 
 For a future editable candidate, first list submissions and reuse an appropriate existing draft. Create one only when needed, take `NEW_SUBMISSION_ID` from its response, and add the future app version:
 
