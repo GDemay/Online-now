@@ -751,3 +751,103 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         print("ONLINE_NOW_MARKETING_SCREENSHOT_END id=\(id)")
     }
 }
+
+/// Lookup-only probe. Its selected test creates no SKTestSession and never taps Purchase.
+/// Run only on a fresh simulator with OnlineNowCatalogProbe (no StoreKit configuration).
+final class OnlineNowCatalogProbeTests: XCTestCase {
+    func testActualAppStoreProductLookupWithoutLocalStoreKit() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--visual-review", "--live-network", "--sandbox-catalog-probe"]
+        app.launch()
+        defer { app.terminate() }
+        let tipJar = app.buttons["navigation.tipJar"]
+        XCTAssertTrue(tipJar.waitForExistence(timeout: 10))
+        tipJar.tap()
+        let diagnostics = app.descendants(matching: .any).matching(identifier: "tipJar.catalogProbe").firstMatch
+        XCTAssertTrue(diagnostics.waitForExistence(timeout: 10))
+
+        let terminalStates: Set<String> = ["available", "empty", "error"]
+        let completed = waitUntil(timeout: 30) {
+            terminalStates.contains(self.probeFields(from: diagnostics)["state"] as? String ?? "")
+        }
+        let initialFields = probeFields(from: diagnostics)
+        emitObservation(fields: initialFields, app: app, completed: completed, attempt: "initial")
+        capture(app: app, named: completed ? "sandbox-catalog-tip-jar" : "sandbox-catalog-lookup-still-loading")
+        if !diagnostics.isHittable {
+            app.scrollViews.firstMatch.swipeUp()
+            capture(app: app, named: "sandbox-catalog-diagnostics-area")
+        }
+
+        let retry = app.buttons["tipJar.retry"]
+        if completed, retry.exists {
+            if !retry.isHittable { app.scrollViews.firstMatch.swipeUp() }
+            retry.tap()
+            let retried = waitUntil(timeout: 15) {
+                let state = self.probeFields(from: diagnostics)["state"] as? String ?? ""
+                return terminalStates.contains(state) && !app.descendants(matching: .any)
+                    .matching(identifier: "tipJar.loading").firstMatch.exists
+            }
+            emitObservation(fields: probeFields(from: diagnostics), app: app, completed: retried, attempt: "retry")
+            capture(app: app, named: "sandbox-catalog-after-retry")
+        }
+        print("ONLINE_NOW_CATALOG_PROBE_LIMITATION Fresh simulator lookup observes the real catalog request without a local StoreKit session; it does not establish sandbox purchase availability on a physical iPad or account agreements. No purchase was attempted.")
+    }
+
+    private func probeFields(from element: XCUIElement) -> [String: Any] {
+        guard let value = element.value as? String,
+              let data = value.data(using: .utf8),
+              let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return fields
+    }
+
+    private func emitObservation(fields: [String: Any], app: XCUIApplication, completed: Bool, attempt: String) {
+        var observation = fields
+        observation["attempt"] = attempt
+        observation["lookupCompletedWithinWait"] = completed
+        observation["purchaseControlExists"] = app.buttons["tipJar.purchase"].exists
+        observation["unavailableStateExists"] = app.staticTexts["tipJar.unavailable"].exists
+        observation["loadingStateExists"] = app.descendants(matching: .any).matching(identifier: "tipJar.loading").firstMatch.exists
+        observation["purchaseAttempted"] = false
+        observation["localStoreKitSessionCreated"] = false
+        if let data = try? JSONSerialization.data(withJSONObject: observation, options: [.sortedKeys]),
+           let value = String(data: data, encoding: .utf8) {
+            print("ONLINE_NOW_CATALOG_PROBE_OBSERVATION \(value)")
+        }
+    }
+
+    private func waitUntil(timeout: TimeInterval, _ condition: @escaping () -> Bool) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in condition() }, object: nil)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func capture(app: XCUIApplication, named name: String) {
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Online Now - Real catalog probe - \(name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        let png = screenshot.pngRepresentation
+        guard png.starts(with: [137, 80, 78, 71, 13, 10, 26, 10]) else {
+            XCTFail("The native capture is not PNG data")
+            return
+        }
+        func slug(_ value: String) -> String {
+            value.unicodeScalars.map { CharacterSet.alphanumerics.contains($0) ? String($0) : "-" }.joined()
+        }
+        let environment = ProcessInfo.processInfo.environment
+        let model = slug(environment["SIMULATOR_MODEL_IDENTIFIER"] ?? "unknown")
+        let device = slug(environment["SIMULATOR_DEVICE_NAME"] ?? model)
+        let encoded = png.base64EncodedData()
+        let chunkSize = 4_000
+        let count = (encoded.count + chunkSize - 1) / chunkSize
+        let id = UUID().uuidString
+        print("ONLINE_NOW_MARKETING_SCREENSHOT_BEGIN id=\(id) name=\(name) device=\(device) bytes=\(png.count) chunks=\(count) model=\(model)")
+        for (index, start) in stride(from: 0, to: encoded.count, by: chunkSize).enumerated() {
+            let end = min(start + chunkSize, encoded.count)
+            let chunk = String(decoding: encoded[start..<end], as: UTF8.self)
+            print("ONLINE_NOW_MARKETING_SCREENSHOT_CHUNK id=\(id) index=\(index) data=\(chunk)")
+        }
+        print("ONLINE_NOW_MARKETING_SCREENSHOT_END id=\(id)")
+    }
+}

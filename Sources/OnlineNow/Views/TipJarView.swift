@@ -43,6 +43,16 @@ public struct TipJarView: View {
 
                     purchaseSection
 
+                    #if DEBUG
+                    if tippingManager.isCatalogProbe {
+                        Text("Catalog lookup diagnostics")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("tipJar.catalogProbe")
+                            .accessibilityValue(tippingManager.catalogProbeSummary)
+                    }
+                    #endif
+
                     if tippingManager.tipCount > 0 {
                         VStack(spacing: 8) {
                             Label("Thank you for your support", systemImage: "heart.fill")

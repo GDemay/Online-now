@@ -15,6 +15,25 @@ public final class TippingManager: ObservableObject {
     @Published public private(set) var isSupporter = false
     @Published public private(set) var isPowerSupporter = false
 
+    #if DEBUG
+    /// Explicit lookup-only diagnostics for a fresh simulator without StoreKit Test.
+    @Published private(set) var catalogProbeSummary = "{}"
+    private var catalogProbeFields: [String: Any] = [:]
+    var isCatalogProbe: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        return args.contains("--ui-testing") && args.contains("--sandbox-catalog-probe")
+    }
+
+    private func recordCatalogProbe(_ fields: [String: Any]) {
+        guard isCatalogProbe else { return }
+        catalogProbeFields.merge(fields) { _, next in next }
+        guard let data = try? JSONSerialization.data(withJSONObject: catalogProbeFields, options: [.sortedKeys]),
+              let value = String(data: data, encoding: .utf8) else { return }
+        catalogProbeSummary = value
+        print("ONLINE_NOW_CATALOG_PROBE \(value)")
+    }
+    #endif
+
     /// Kept for source compatibility. Historic totals were not currency-aware;
     /// new tips are counted rather than adding incompatible local currencies.
     @available(*, deprecated, message: "Use tipCount; tips may use different currencies.")
@@ -56,6 +75,27 @@ public final class TippingManager: ObservableObject {
         }
         refreshSupporterStatus()
 
+        #if DEBUG
+        if isCatalogProbe {
+            recordCatalogProbe([
+                "state": "created", "purchaseAttempted": false,
+                "bundle": Bundle.main.bundleIdentifier ?? "unknown",
+                "appVersion": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
+                "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown",
+                "requestedIds": Array(Self.productIDs).sorted(),
+                "canMakePayments": AppStore.canMakePayments,
+                "localStoreKitSessionCreated": false
+            ])
+            Task { [weak self] in
+                let storefront = await Storefront.current
+                self?.recordCatalogProbe([
+                    "storefrontCountry": storefront?.countryCode ?? "unavailable",
+                    "storefrontId": storefront?.id ?? "unavailable"
+                ])
+            }
+        }
+        #endif
+
         guard startsStoreKit else { return }
         // Listen before querying unfinished purchases so no delivery is missed.
         transactionListener = Task { [weak self] in
@@ -79,38 +119,44 @@ public final class TippingManager: ObservableObject {
     }
 
     public func loadProducts() async {
-        #if DEBUG
-        let args = ProcessInfo.processInfo.arguments
-        if args.contains("--ui-testing"), args.contains("--visual-review") {
-            // Rendering fixtures only; purchase workflow tests use a real SKTestSession.
-            if args.contains("--tip-loading") {
-                isLoading = true
-                return
-            }
-            if args.contains("--tip-unavailable") {
-                products = []
-                isLoading = false
-                errorMessage = "We couldn’t connect to the App Store. Check your connection and try again."
-                return
-            }
-        }
-        #endif
         guard !isLoading, !isPurchasing else { return }
         guard ledgerIsReadable else { return }
         isLoading = true
         errorMessage = nil
+        #if DEBUG
+        recordCatalogProbe(["state": "loading"])
+        #endif
         defer { isLoading = false }
         do {
             let loaded = try await Product.products(for: Array(Self.productIDs))
             products = loaded.filter {
                 Self.productIDs.contains($0.id) && $0.type == .consumable
             }.sorted { $0.price < $1.price }
+            #if DEBUG
+            recordCatalogProbe([
+                "state": products.isEmpty ? "empty" : "available",
+                "returnedIds": loaded.map(\.id).sorted(),
+                "acceptedIds": products.map(\.id).sorted(),
+                "returnedCount": loaded.count, "acceptedCount": products.count
+            ])
+            #endif
             if products.isEmpty {
                 errorMessage = "Tipping is currently unavailable. Please try again later. All app features remain free."
             }
         } catch {
             products = []
             errorMessage = "We couldn’t connect to the App Store. Check your connection and try again."
+            #if DEBUG
+            let failure = error as NSError
+            var fields: [String: Any] = [
+                "state": "error", "errorDomain": failure.domain, "errorCode": failure.code
+            ]
+            if let underlying = failure.userInfo[NSUnderlyingErrorKey] as? NSError {
+                fields["underlyingErrorDomain"] = underlying.domain
+                fields["underlyingErrorCode"] = underlying.code
+            }
+            recordCatalogProbe(fields)
+            #endif
         }
     }
 
@@ -137,6 +183,14 @@ public final class TippingManager: ObservableObject {
                 errorMessage = "The App Store hasn’t confirmed this tip. Please try again later."
                 return false
             }
+        } catch StoreKitError.userCancelled {
+            // StoreKit may deliver cancellation as either a result or an error.
+            // Neither is a failed payment or a reason to show an error message.
+            return false
+        } catch let error as SKError where error.code == .paymentCancelled {
+            return false
+        } catch is CancellationError {
+            return false
         } catch {
             errorMessage = "Your tip couldn’t be completed. Please try again."
             return false
