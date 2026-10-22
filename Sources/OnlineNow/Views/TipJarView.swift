@@ -121,16 +121,14 @@ public struct TipJarView: View {
                 retryButton
             } else {
                 ForEach(tippingManager.products, id: \.id) { product in
-                    TipOptionCard(
-                        product: product,
-                        isPurchasing: tippingManager.isPurchasing && selectedProductID == product.id
-                    ) {
-                        selectedProductID = product.id
-                        Task {
-                            if await tippingManager.purchase(product) { showThankYou = true }
+                    if #available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, *) {
+                        TipPurchaseContext { purchaseAction in
+                            tipOption(for: product) { try await purchaseAction($0) }
                         }
+                    } else {
+                        // Preserve the library's iOS 15/macOS 12 availability.
+                        tipOption(for: product) { try await $0.purchase() }
                     }
-                    .disabled(tippingManager.isPurchasing || tippingManager.isPending)
                 }
                 if let message = tippingManager.errorMessage {
                     Text(message)
@@ -143,6 +141,24 @@ public struct TipJarView: View {
         }
     }
 
+    private func tipOption(
+        for product: Product,
+        performPurchase: @escaping @MainActor (Product) async throws -> Product.PurchaseResult
+    ) -> some View {
+        TipOptionCard(
+            product: product,
+            isPurchasing: tippingManager.isPurchasing && selectedProductID == product.id
+        ) {
+            selectedProductID = product.id
+            Task { @MainActor in
+                if await tippingManager.purchase(product, performPurchase: performPurchase) {
+                    showThankYou = true
+                }
+            }
+        }
+        .disabled(tippingManager.isPurchasing || tippingManager.isPending)
+    }
+
     private var retryButton: some View {
         Button {
             Task { await tippingManager.loadProducts() }
@@ -153,6 +169,21 @@ public struct TipJarView: View {
         .buttonStyle(.bordered)
         .accessibilityIdentifier("tipJar.retry")
     }
+}
+
+/// Read the action inside the presenting SwiftUI hierarchy so StoreKit receives
+/// the correct scene for its payment confirmation UI. Never store it in a model.
+@available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, *)
+@MainActor
+private struct TipPurchaseContext<Content: View>: View {
+    @Environment(\.purchase) private var purchaseAction
+    let content: (PurchaseAction) -> Content
+
+    init(content: @escaping (PurchaseAction) -> Content) {
+        self.content = content
+    }
+
+    var body: some View { content(purchaseAction) }
 }
 
 @available(iOS 15.0, macOS 12.0, *)

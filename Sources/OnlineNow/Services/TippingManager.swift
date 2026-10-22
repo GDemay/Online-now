@@ -100,6 +100,15 @@ public final class TippingManager: ObservableObject {
 
     /// Returns true only after a verified tip has been saved locally and finished.
     public func purchase(_ product: Product) async -> Bool {
+        await purchase(product, performPurchase: { try await $0.purchase() })
+    }
+
+    /// The view supplies its scene-aware StoreKit action. Accounting, verified
+    /// delivery, pending state, and error handling stay in this manager.
+    func purchase(
+        _ product: Product,
+        performPurchase: @MainActor (Product) async throws -> Product.PurchaseResult
+    ) async -> Bool {
         guard !isPurchasing, !isPending, ledgerIsReadable else { return false }
         guard Self.productIDs.contains(product.id), product.type == .consumable else {
             errorMessage = "This tip option is unavailable. Please reload the tip jar."
@@ -109,7 +118,7 @@ public final class TippingManager: ObservableObject {
         errorMessage = nil
         defer { isPurchasing = false }
         do {
-            switch try await product.purchase() {
+            switch try await performPurchase(product) {
             case .success(let result):
                 return await process(result)
             case .userCancelled:
