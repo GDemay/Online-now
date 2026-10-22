@@ -269,6 +269,50 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         capture("online-recent-activity")
     }
 
+    /// Compare actual rendered status and enabled bordered labels in both appearances.
+    /// Connectivity and unavailable-product inputs are DEBUG fixtures; no purchase runs.
+    func testVisualStatusPalette() throws {
+        let states = [
+            (scenario: "online", title: "You're Online", capture: "online-home"),
+            (scenario: "limited", title: "Limited Access", capture: "limited-connectivity-home"),
+            (scenario: "offline", title: "You're Offline", capture: "offline-home"),
+            (scenario: "checking", title: "Checking...", capture: "connection-check-in-progress")
+        ]
+        for dark in [false, true] {
+            let flags = dark ? ["--dark-mode"] : []
+            let prefix = dark ? "dark-" : ""
+            for state in states {
+                launch(scenario: state.scenario, seeded: state.scenario == "online", flags: flags)
+                if state.scenario == "checking" {
+                    require(app.buttons["connectivity.refresh"])
+                } else {
+                    waitForReady()
+                }
+                let title = textContaining(state.title)
+                require(title)
+                requireViewport(title, context: "\(prefix)\(state.capture)-status")
+                requireViewport(app.buttons["connectivity.refresh"], context: "\(prefix)\(state.capture)-refresh")
+                // Preserve the initial, unscrolled Home viewport for this proof.
+                capture(dark && state.scenario == "online" ? "dark-home" : "\(prefix)\(state.capture)")
+                app.terminate()
+            }
+            launch(scenario: "offline", flags: flags + ["--tip-prompt"])
+            let dismissPrompt = app.buttons["tipPrompt.dismiss"]
+            require(dismissPrompt)
+            capture("\(prefix)optional-tip-prompt", showing: dismissPrompt)
+            app.terminate()
+            launch(scenario: "offline", flags: flags + ["--tip-unavailable"])
+            waitForReady()
+            tap("navigation.tipJar")
+            let retry = app.buttons["tipJar.retry"]
+            require(retry)
+            scrollTo(retry)
+            XCTAssertTrue(retry.isEnabled)
+            capture("\(prefix)tip-catalog-unavailable", showing: retry)
+            app.terminate()
+        }
+    }
+
     /// One current-palette portrait pass for the gallery's core product views.
     func testVisualFinalPortraitOverview() throws {
         _ = try configureStore()
