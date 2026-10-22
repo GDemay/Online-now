@@ -205,7 +205,7 @@ public struct ConnectivityStatusView: View {
             if let error = viewModel.errorMessage {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(.callout)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(OnlineNowColors.warningText(in: colorScheme))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("measurementError")
             }
@@ -217,6 +217,7 @@ public struct ConnectivityStatusView: View {
             actionTask = Task { await viewModel.quickCheck() }
         } label: {
             Label("Refresh", systemImage: "arrow.clockwise")
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.bordered)
@@ -293,10 +294,10 @@ public struct ConnectivityStatusView: View {
 
     private var statusBackgroundColor: Color {
         switch viewModel.state {
-        case .online: return .green
-        case .offline: return .red
-        case .limitedConnectivity: return .orange
-        case .checking, .measuringSpeed: return .blue
+        case .online: return OnlineNowColors.successText(in: colorScheme)
+        case .offline: return OnlineNowColors.errorText(in: colorScheme)
+        case .limitedConnectivity: return OnlineNowColors.warningText(in: colorScheme)
+        case .checking, .measuringSpeed: return OnlineNowColors.informationText(in: colorScheme)
         default: return .gray
         }
     }
@@ -487,11 +488,11 @@ public struct ConnectivityStatusView: View {
 
     private var qualityColor: Color {
         switch viewModel.signalQuality {
-        case "Excellent": return .green
-        case "Good": return .blue
-        case "Fair": return .orange
-        case "Poor": return .red
-        default: return .gray
+        case "Excellent": return OnlineNowColors.successText(in: colorScheme)
+        case "Good": return OnlineNowColors.informationText(in: colorScheme)
+        case "Fair": return OnlineNowColors.warningText(in: colorScheme)
+        case "Poor": return OnlineNowColors.errorText(in: colorScheme)
+        default: return Color.primary.opacity(0.75)
         }
     }
 
@@ -562,7 +563,7 @@ public struct ConnectivityStatusView: View {
                             }
                             Label("Possible VPN", systemImage: "lock.shield.fill")
                                 .font(.footnote)
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(OnlineNowColors.informationText(in: colorScheme))
                         }
                     }
                 }
@@ -609,7 +610,8 @@ public struct ConnectivityStatusView: View {
                     icon: "checkmark.seal.fill",
                     label: "Internet Reachability",
                     value: viewModel.isReachable ? "Verified" : "Not Verified",
-                    valueColor: viewModel.isReachable ? .green : .orange
+                    valueColor: viewModel.isReachable ? OnlineNowColors.successText(in: colorScheme)
+                        : OnlineNowColors.warningText(in: colorScheme)
                 )
 
                 Divider()
@@ -618,7 +620,8 @@ public struct ConnectivityStatusView: View {
                     icon: "g.circle.fill",
                     label: "Google",
                     value: endpointStatus(viewModel.isGoogleReachable),
-                    valueColor: viewModel.isGoogleReachable ? .green : Color.primary.opacity(0.75)
+                    valueColor: viewModel.isGoogleReachable ? OnlineNowColors.successText(in: colorScheme)
+                        : Color.primary.opacity(0.75)
                 )
 
                 Divider()
@@ -627,7 +630,8 @@ public struct ConnectivityStatusView: View {
                     icon: "server.rack",
                     label: "Cloudflare HTTPS",
                     value: endpointStatus(viewModel.isCloudflareReachable),
-                    valueColor: viewModel.isCloudflareReachable ? .green : Color.primary.opacity(0.75)
+                    valueColor: viewModel.isCloudflareReachable ? OnlineNowColors.successText(in: colorScheme)
+                        : Color.primary.opacity(0.75)
                 )
 
                 Divider()
@@ -645,7 +649,7 @@ public struct ConnectivityStatusView: View {
                         icon: "antenna.radiowaves.left.and.right",
                         label: "Data Usage",
                         value: viewModel.isConstrained ? "Low Data Mode" : "Metered connection",
-                        valueColor: .orange
+                        valueColor: OnlineNowColors.warningText(in: colorScheme)
                     )
                 }
 
@@ -664,7 +668,7 @@ public struct ConnectivityStatusView: View {
                         icon: "lock.shield.fill",
                         label: "VPN Detection",
                         value: "Tunnel detected",
-                        valueColor: .blue
+                        valueColor: OnlineNowColors.informationText(in: colorScheme)
                     )
                 }
 

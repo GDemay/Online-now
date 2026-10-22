@@ -5,6 +5,7 @@ import SwiftUI
 @available(iOS 15.0, macOS 12.0, *)
 public struct TipJarView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var tippingManager: TippingManager
     @State private var selectedProductID: String?
     @State private var showThankYou = false
@@ -132,7 +133,7 @@ public struct TipJarView: View {
                 }
                 if let message = tippingManager.errorMessage {
                     Text(message)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(OnlineNowColors.errorText(in: colorScheme))
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
                         .accessibilityIdentifier("tipJar.error")
@@ -164,6 +165,7 @@ public struct TipJarView: View {
             Task { await tippingManager.loadProducts() }
         } label: {
             Label("Try again", systemImage: "arrow.clockwise")
+                .foregroundStyle(.primary)
                 .frame(minHeight: 44)
         }
         .buttonStyle(.bordered)
