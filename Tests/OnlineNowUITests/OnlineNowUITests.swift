@@ -127,6 +127,7 @@ final class OnlineNowUITests: XCTestCase {
         attachScreenshot(named: "Online Now - Approved Ask to Buy")
     }
 
+    @MainActor
     func testCancelledTipDoesNotShowFailureOrCreditSupport() async throws {
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
@@ -151,6 +152,11 @@ final class OnlineNowUITests: XCTestCase {
     }
 
     func testLargeTextNavigation() throws {
+        let store = try SKTestSession(configurationFileNamed: "Configuration")
+        storeKitSession = store
+        store.resetToDefaultState()
+        store.disableDialogs = true
+        store.clearTransactions()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
         let history = app.buttons["navigation.history"]
@@ -158,6 +164,18 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(history.isHittable)
         history.tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "Online Now - Largest text history")
+        app.buttons["Done"].tap()
+        app.buttons["navigation.tipJar"].tap()
+        let purchase = app.buttons["tipJar.purchase"]
+        XCTAssertTrue(purchase.waitForExistence(timeout: 15))
+        for _ in 0..<10 where !purchase.isHittable {
+            app.scrollViews.allElementsBoundByIndex.last(where: { $0.isHittable })?.swipeUp()
+        }
+        XCTAssertTrue(purchase.isHittable, "The tip action must remain reachable at the largest text size")
+        XCTAssertLessThanOrEqual(purchase.frame.height, app.frame.height - 150,
+                                 "The product title and price must fit together in the visible sheet")
+        attachScreenshot(named: "Online Now - Largest text readable tip option")
     }
 
     private var supportSummary: XCUIElement {

@@ -160,6 +160,9 @@ public struct HistoryListView: View {
 
     private var statisticsSection: some View {
         let stats = historyManager.getStatistics()
+        let visibleCount = historyManager.recentChecks.count
+        let visibleNoun = visibleCount == 1 ? "check" : "checks"
+        let savedNoun = stats.totalChecks == 1 ? "check" : "checks"
 
         return VStack(alignment: .leading, spacing: 12) {
             Text("Saved Checks Overview")
@@ -197,48 +200,83 @@ public struct HistoryListView: View {
                     color: .red
                 )
             }
-            Text("Showing the latest \(historyManager.recentChecks.count) checks. Summary and export include all \(stats.totalChecks) saved checks, up to 100.")
+            Text("Showing the latest \(visibleCount) \(visibleNoun). Summary and export include \(stats.totalChecks) saved \(savedNoun), up to 100.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             // Average speed if available
             if let avgSpeed = stats.averageSpeedMbps {
+                averageSpeedCard(avgSpeed)
+            }
+        }
+    }
+
+    private func averageSpeedCard(_ speed: Double) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Average Speed", systemImage: "speedometer")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    averageSpeedValue(speed)
+                    speedQualityBadge(speed)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
                 HStack(spacing: 12) {
                     Image(systemName: "speedometer")
                         .font(.system(size: 18))
                         .foregroundStyle(.orange)
                         .frame(width: 32)
-
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Average Speed")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(String(format: "%.1f", avgSpeed))
-                                .font(.system(.title2, design: .rounded, weight: .bold))
-                            Text("Mbps")
-                                .font(.footnote.weight(.medium))
-                                .foregroundStyle(.secondary)
-                        }
+                        averageSpeedValue(speed)
                     }
-
                     Spacer()
-
-                    // Speed quality badge
-                    Text(speedQuality(avgSpeed))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(speedQualityColor(avgSpeed), in: Capsule())
+                    speedQualityBadge(speed)
                 }
-                .padding(16)
-                .background(cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         }
+        .padding(16)
+        .background(cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("history.averageSpeed")
+    }
+
+    @ViewBuilder
+    private func averageSpeedValue(_ speed: Double) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(format: "%.1f", speed))
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                Text("Mbps")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(String(format: "%.1f", speed))
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                Text("Mbps")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func speedQualityBadge(_ speed: Double) -> some View {
+        Text(speedQuality(speed))
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(speedQualityColor(speed), in: Capsule())
     }
 
     private func speedQuality(_ speed: Double) -> String {
@@ -362,25 +400,31 @@ struct HistoryStatCard: View {
 /// Individual row for a connectivity check
 @available(iOS 17.0, *)
 struct HistoryRowView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let check: ConnectivityCheck
 
     var body: some View {
-        HStack(spacing: 14) {
-            // Status indicator
-            ZStack {
-                Circle()
-                    .fill(statusColor.opacity(0.15))
-                    .frame(width: 40, height: 40)
-
-                Image(systemName: statusIcon)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(statusColor)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                expandedContent
+            } else {
+                compactContent
             }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityIdentifier("history.record")
+    }
 
+    private var compactContent: some View {
+        HStack(spacing: 14) {
+            statusIndicator
             VStack(alignment: .leading, spacing: 4) {
                 // Status and connection type
                 HStack(spacing: 6) {
-                    Text(check.isReachable ? "Online" : (check.isConnected ? "Limited" : "Offline"))
+                    Text(statusText)
                         .font(.subheadline.weight(.semibold))
 
                     Text("•")
@@ -417,10 +461,59 @@ struct HistoryRowView: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                statusIndicator
+                Text(statusText)
+                    .font(.subheadline.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(check.connectionType)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if check.isVPNActive {
+                Label("Possible VPN", systemImage: "lock.shield.fill")
+                    .font(.caption)
+                    .foregroundStyle(.blue)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(check.timestamp, format: .dateTime.month(.abbreviated).day())
+                Text(check.timestamp, format: .dateTime.hour().minute())
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            if let speed = check.speedMbps {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(formatSpeed(speed))
+                        .font(.system(.body, design: .rounded, weight: .bold))
+                        .monospacedDigit()
+                    Text("Mbps")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var statusIndicator: some View {
+        ZStack {
+            Circle()
+                .fill(statusColor.opacity(0.15))
+                .frame(width: 40, height: 40)
+            Image(systemName: statusIcon)
+                .font(dynamicTypeSize.isAccessibilitySize ? .system(size: 18, weight: .semibold) : .body.weight(.semibold))
+                .foregroundStyle(statusColor)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var statusText: String {
+        check.isReachable ? "Online" : (check.isConnected ? "Limited" : "Offline")
     }
 
     private var statusColor: Color {
