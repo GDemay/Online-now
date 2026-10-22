@@ -371,8 +371,10 @@ public struct ConnectivityStatusView: View {
             if let lastCheck = viewModel.lastCheckTime {
                 let formatter = RelativeDateTimeFormatter()
                 formatter.unitsStyle = .abbreviated
-                subtitle +=
-                    " • Updated \(formatter.localizedString(for: lastCheck, relativeTo: Date()))"
+                let now = Date()
+                let elapsed = now.timeIntervalSince(lastCheck)
+                subtitle += elapsed < 1 ? " • Updated just now" :
+                    " • Updated \(formatter.localizedString(for: lastCheck, relativeTo: now))"
             }
             return subtitle
         case .offline: return "No internet connection detected"
@@ -493,11 +495,14 @@ public struct ConnectivityStatusView: View {
     private func recentActivityCard(_ check: ConnectivityCheck) -> some View {
         Button { showHistory = true } label: {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
+            let headerLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                : AnyLayout(HStackLayout(spacing: 16))
+            headerLayout {
                 Label("Recent Activity", systemImage: "clock")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 16) }
                 if let timeAgo = viewModel.historyManager.timeSinceLastCheck() {
                     Text(timeAgo)
                         .font(.footnote.weight(.medium))
@@ -505,7 +510,10 @@ public struct ConnectivityStatusView: View {
                 }
             }
 
-            HStack(spacing: 16) {
+            let contentLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                : AnyLayout(HStackLayout(spacing: 16))
+            contentLayout {
                 // Status indicator
                 ZStack {
                     Circle()
@@ -526,22 +534,27 @@ public struct ConnectivityStatusView: View {
                     Text(check.isReachable ? "Connection Verified" : "Connection Failed")
                         .font(.body.weight(.semibold))
 
-                    HStack(spacing: 8) {
+                    let detailLayout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                        : AnyLayout(HStackLayout(spacing: 8))
+                    detailLayout {
                         Text(check.connectionType)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
 
                         if let speed = check.speedMbps {
-                            Text("•")
-                                .foregroundStyle(.tertiary)
+                            if !dynamicTypeSize.isAccessibilitySize {
+                                Text("•").foregroundStyle(.tertiary)
+                            }
                             Text(String(format: "%.1f Mbps", speed))
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
 
                         if check.isVPNActive {
-                            Text("•")
-                                .foregroundStyle(.tertiary)
+                            if !dynamicTypeSize.isAccessibilitySize {
+                                Text("•").foregroundStyle(.tertiary)
+                            }
                             Label("Possible VPN", systemImage: "lock.shield.fill")
                                 .font(.footnote)
                                 .foregroundStyle(.blue)
@@ -549,11 +562,12 @@ public struct ConnectivityStatusView: View {
                     }
                 }
 
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
         .padding(20)
@@ -827,29 +841,50 @@ struct NetworkInfoRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-            : AnyLayout(HStackLayout(alignment: .center, spacing: 8))
-        layout {
-            HStack(spacing: 8) {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                verticalContent
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        labelContent.fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 16)
+                        valueContent.fixedSize(horizontal: true, vertical: false)
+                    }
+                    verticalContent
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var labelContent: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
                 .frame(width: 24)
-
+                .accessibilityHidden(true)
             Text(label)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            }
-
-            if !dynamicTypeSize.isAccessibilitySize { Spacer() }
-
-            Text(value)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(valueColor)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .accessibilityElement(children: .combine)
+    }
+
+    private var valueContent: some View {
+        Text(value)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(valueColor)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var verticalContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            labelContent
+            valueContent
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

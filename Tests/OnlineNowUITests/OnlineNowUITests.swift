@@ -238,6 +238,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         app.buttons["Done"].tap()
 
         tap("connectivity.speed")
+        require(app.buttons["Done"])
         capture("speed-detail-empty-top")
         scrollTo(app.staticTexts["Run Test Speed to start your speed history."])
         capture("speed-detail-empty-history")
@@ -282,17 +283,23 @@ final class OnlineNowVisualReviewTests: XCTestCase {
             tap(identifier)
             require(app.buttons["Done"])
             capture("detail-\(name)-top")
+            let about = identified("statDetail.description")
+            require(about)
+            scrollTo(about)
+            capture("detail-\(name)-about")
             if name == "speed" || name == "tcp" {
-                scrollTo(app.staticTexts["History (Last 20 checks)"])
-                swipeUpOnce()
+                let plot = identified("statDetail.plot")
+                require(plot)
+                scrollTo(plot)
                 capture("detail-\(name)-history-chart")
-            } else {
-                scrollTo(app.staticTexts["Benchmarks"])
-                swipeUpOnce()
-                capture("detail-\(name)-benchmarks")
             }
-            scrollTo(app.staticTexts["Tips"])
-            swipeUpOnce()
+            let benchmarks = identified("statDetail.benchmarks")
+            require(benchmarks)
+            scrollTo(benchmarks)
+            capture("detail-\(name)-benchmarks")
+            let tips = identified("statDetail.tips")
+            require(tips)
+            scrollTo(tips)
             capture("detail-\(name)-guidance")
             app.buttons["Done"].tap()
         }
@@ -302,26 +309,47 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         launch(scenario: "online", seeded: true)
         waitForReady()
         tap("navigation.history")
-        require(app.buttons["history.export"])
+        let export = app.buttons["history.export"]
+        require(export)
         capture("history-populated-overview")
         scrollTo(app.staticTexts["Recent Checks"])
-        swipeUpOnce()
         capture("history-populated-records")
 
-        app.buttons["history.export"].tap()
+        export.tap()
+        let save = app.buttons.matching(NSPredicate(format: "label == %@", "Save")).firstMatch
+        require(save, timeout: 12)
+        XCTAssertTrue(save.waitForEnabled(timeout: 10))
+        capture("history-csv-export-picker")
+        save.tap()
+        let replace = app.buttons.matching(NSPredicate(format: "label == %@", "Replace")).firstMatch
+        if replace.waitForExistence(timeout: 1) { replace.tap() }
+        XCTAssertTrue(waitUntil(15) { export.exists && export.isHittable && !save.exists },
+                      "Saving the exported CSV must return to History")
+        XCTAssertFalse(app.alerts["Couldn't Export History"].exists)
+        capture("history-csv-saved-return")
+        print("ONLINE_NOW_VISUAL_OBSERVATION csv-file-export-save-completed=true")
+
+        // Check cancellation independently; iOS file-browser chrome differs by device.
+        export.tap()
+        require(save, timeout: 10)
         let cancel = app.buttons.matching(NSPredicate(format: "label == %@", "Cancel")).firstMatch
-        if cancel.waitForExistence(timeout: 8) {
-            capture("history-csv-export-picker")
+        if cancel.waitForExistence(timeout: 2) {
             cancel.tap()
-            // Some system exporter versions report cancellation as an NSError.
-            // Preserve evidence of the actual app's response before dismissing it.
-            let exportError = app.alerts["Couldn't Export History"]
-            if exportError.waitForExistence(timeout: 1) {
-                capture("history-export-cancel-response")
-                exportError.buttons["OK"].tap()
-            }
         } else {
-            capture("history-csv-export-system-response")
+            let screen = app.frame
+            let start = app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: screen.midX, dy: screen.minY + screen.height * 0.09))
+            let end = app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: screen.midX, dy: screen.minY + screen.height * 0.75))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.15)
+        }
+        let cancelled = waitUntil(8) { export.exists && export.isHittable && !save.exists }
+        print("ONLINE_NOW_VISUAL_OBSERVATION csv-file-export-cancel-completed=\(cancelled)")
+        if cancelled {
+            XCTAssertFalse(app.alerts["Couldn't Export History"].exists)
+            capture("history-csv-cancelled-return")
+        } else {
+            capture("history-csv-cancellation-ui-unavailable")
             app.terminate()
             launch(scenario: "online", seeded: true)
             waitForReady()
@@ -336,7 +364,6 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         if dismiss.exists && dismiss.isHittable {
             dismiss.tap()
         } else {
-            // iPad popover dialogs are dismissed by tapping outside the popover.
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.25)).tap()
         }
         require(app.buttons["history.export"])
@@ -427,6 +454,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         capture("tip-approved-once")
     }
 
+    @MainActor
     func testVisualTipFailureAndRecovery() async throws {
         let session = try configureStore()
         let simulatedFailure = SKTestFailures.Purchase.generic(.unknown)
@@ -447,6 +475,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         XCTAssertEqual(recordedTipCount(), initialCount)
         scrollTo(error)
         capture("tip-purchase-failed-retry")
+        print("ONLINE_NOW_STOREKIT_ERROR_CONTEXT phase=purchase-failure json=\(error.value as? String ?? "")")
         try await session.setSimulatedError(nil, forAPI: .purchase)
         let clearedFailure = await session.simulatedError(forAPI: .purchase)
         XCTAssertNil(clearedFailure)
@@ -460,6 +489,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         capture("tip-purchase-recovered")
     }
 
+    @MainActor
     func testVisualTipCancellation() async throws {
         let session = try configureStore()
         let cancellation = SKTestFailures.Purchase.generic(.userCancelled)
@@ -479,6 +509,10 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         XCTAssertFalse(app.alerts["Thank you!"].exists)
         capture("tip-cancelled-storekit-response")
         print("ONLINE_NOW_VISUAL_OBSERVATION storekit-user-cancellation-injected=true purchase-enabled=\(simulatedPurchase.isEnabled) credited=false error-message-visible=\(app.staticTexts["tipJar.error"].exists)")
+        let cancellationError = app.staticTexts["tipJar.error"]
+        if cancellationError.exists {
+            print("ONLINE_NOW_STOREKIT_ERROR_CONTEXT phase=user-cancellation json=\(cancellationError.value as? String ?? "")")
+        }
         try await session.setSimulatedError(nil, forAPI: .purchase)
         let clearedCancellation = await session.simulatedError(forAPI: .purchase)
         XCTAssertNil(clearedCancellation)
@@ -540,23 +574,29 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         capture("ax5-home-top")
         scrollTo(app.buttons["connectivity.speedTest"])
         capture("ax5-measurement-controls")
-        scrollTo(app.buttons["connectivity.speed"])
+        scrollTo(textContaining("Network Details"), maximumSwipes: 20)
+        capture("ax5-network-details-top")
+        scrollTo(textContaining("Connection Quality"), maximumSwipes: 20)
+        capture("ax5-network-details-quality")
+        scrollTo(app.buttons["connectivity.recentActivity"], maximumSwipes: 20)
+        capture("ax5-recent-activity")
+        scrollTo(app.buttons["connectivity.speed"], maximumSwipes: 28, towardsTopWhenMissing: true)
         tap("connectivity.speed")
         require(app.buttons["Done"])
         capture("ax5-speed-detail-top")
-        scrollTo(app.staticTexts["Benchmarks"], maximumSwipes: 8)
+        scrollTo(app.staticTexts["Benchmarks"], maximumSwipes: 16)
         capture("ax5-speed-detail-benchmarks")
         app.buttons["Done"].tap()
         tap("navigation.history")
         require(app.buttons["history.export"])
         capture("ax5-history-overview")
-        scrollTo(app.staticTexts["Recent Checks"], maximumSwipes: 8)
+        scrollTo(app.staticTexts["Recent Checks"], maximumSwipes: 16)
         capture("ax5-history-records")
         app.buttons["Done"].tap()
         tap("navigation.tipJar")
         require(app.buttons["tipJar.purchase"], timeout: 15)
         capture("ax5-tip-jar-top")
-        scrollTo(app.buttons["tipJar.purchase"], maximumSwipes: 8)
+        scrollTo(app.buttons["tipJar.purchase"], maximumSwipes: 16)
         capture("ax5-tip-jar-purchase")
         print("ONLINE_NOW_VISUAL_OBSERVATION ax5-purchase-hittable=\(app.buttons["tipJar.purchase"].isHittable)")
     }
@@ -567,7 +607,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         launch(scenario: "offline", flags: flags)
         require(app.buttons["tipPrompt.dismiss"])
         capture("ax5-optional-tip-prompt")
-        scrollTo(app.buttons["tipPrompt.dismiss"], maximumSwipes: 8)
+        scrollTo(app.buttons["tipPrompt.dismiss"], maximumSwipes: 16)
         capture("ax5-tip-prompt-dismiss-action")
         XCTAssertTrue(app.buttons["tipPrompt.dismiss"].isHittable)
         app.buttons["tipPrompt.dismiss"].tap()
@@ -575,7 +615,7 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         app.terminate()
 
         launch(scenario: "offline", flags: flags)
-        scrollTo(app.buttons["tipPrompt.open"], maximumSwipes: 8)
+        scrollTo(app.buttons["tipPrompt.open"], maximumSwipes: 16)
         capture("ax5-tip-prompt-open-action")
         XCTAssertTrue(app.buttons["tipPrompt.open"].isHittable)
         app.buttons["tipPrompt.open"].tap()
@@ -669,7 +709,9 @@ final class OnlineNowVisualReviewTests: XCTestCase {
     }
 
     private func recordedTipCount() -> Int {
-        Int(supportSummary.value as? String ?? "") ?? 0
+        // The support summary is intentionally absent before the first tip.
+        guard supportSummary.exists else { return 0 }
+        return Int(supportSummary.value as? String ?? "") ?? 0
     }
 
     private func textContaining(_ text: String) -> XCUIElement {
@@ -689,26 +731,75 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         button.tap()
     }
 
-    private func scrollTo(_ element: XCUIElement, maximumSwipes: Int = 5) {
-        for _ in 0..<maximumSwipes {
-            if element.exists && element.isHittable { return }
-            let scroll = app.scrollViews.allElementsBoundByIndex.first(where: { $0.isHittable })
-            let above = element.exists && element.frame.height > 0
-                && element.frame.midY < app.frame.midY
-            if let scroll {
-                if above { scroll.swipeDown() } else { scroll.swipeUp() }
-            } else {
-                if above { app.swipeDown() } else { app.swipeUp() }
+    private func identified(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    /// The last visible scroll view belongs to the current sheet, rather than
+    /// the still-present Home scroll view underneath a modal on iPad.
+    private var activeScrollView: XCUIElement? {
+        app.scrollViews.allElementsBoundByIndex.last {
+            $0.exists && $0.isHittable && !$0.frame.intersection(app.frame).isEmpty
+        }
+    }
+
+    private func visibleViewport(for scroll: XCUIElement?) -> CGRect {
+        var viewport = (scroll?.frame ?? app.frame).intersection(app.frame)
+        for bar in app.navigationBars.allElementsBoundByIndex where bar.exists && bar.isHittable {
+            let rect = bar.frame
+            if rect.intersects(viewport), rect.maxY < viewport.maxY,
+               rect.width > viewport.width * 0.5 {
+                let top = max(viewport.minY, rect.maxY)
+                viewport = CGRect(x: viewport.minX, y: top, width: viewport.width,
+                                  height: max(1, viewport.maxY - top))
             }
+        }
+        if viewport.isNull || viewport.width < 40 || viewport.height < 40 { viewport = app.frame }
+        return viewport.insetBy(dx: 6, dy: 10)
+    }
+
+    private func scrollTo(_ element: XCUIElement, maximumSwipes: Int = 16,
+                          towardsTopWhenMissing: Bool = false) {
+        for _ in 0..<maximumSwipes {
+            let scroll = activeScrollView
+            let viewport = visibleViewport(for: scroll)
+            let exists = element.exists
+            let frame = exists ? element.frame : .zero
+            if exists, !frame.isEmpty {
+                if frame.height <= viewport.height,
+                   viewport.contains(CGPoint(x: frame.midX, y: frame.minY)),
+                   viewport.contains(CGPoint(x: frame.midX, y: frame.maxY)) {
+                    return
+                }
+                if frame.height > viewport.height,
+                   frame.minY >= viewport.minY - 8, frame.minY <= viewport.minY + 35 {
+                    return
+                }
+            }
+            let delta: CGFloat
+            if exists, !frame.isEmpty {
+                delta = frame.height > viewport.height
+                    ? frame.minY - viewport.minY : frame.midY - viewport.midY
+            } else {
+                delta = viewport.height * (towardsTopWhenMissing ? -0.25 : 0.25)
+            }
+            let step = min(viewport.height * 0.25, max(28, abs(delta)))
+            let x = viewport.minX + viewport.width * 0.88
+            let midY = viewport.midY
+            let upwards = delta >= 0
+            let startY = midY + (upwards ? step / 2 : -step / 2)
+            let endY = midY - (upwards ? step / 2 : -step / 2)
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(dx: x - app.frame.minX, dy: startY - app.frame.minY))
+            let end = origin.withOffset(CGVector(dx: x - app.frame.minX, dy: endY - app.frame.minY))
+            start.press(forDuration: 0.03, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.1)
+            Thread.sleep(forTimeInterval: 0.2)
         }
     }
 
     private func swipeUpOnce() {
-        if let scroll = app.scrollViews.allElementsBoundByIndex.first(where: { $0.isHittable }) {
-            scroll.swipeUp()
-        } else {
-            app.swipeUp()
-        }
+        if let scroll = activeScrollView { scroll.swipeUp(velocity: .slow) }
+        else { app.swipeUp(velocity: .slow) }
     }
 
     private func waitUntil(_ timeout: TimeInterval, _ condition: @escaping () -> Bool) -> Bool {
@@ -722,6 +813,8 @@ final class OnlineNowVisualReviewTests: XCTestCase {
             XCTFail("Visual captures must come from the isolated UI-test process")
             return
         }
+        // Settle short SwiftUI transitions without blocking the app process.
+        Thread.sleep(forTimeInterval: 0.5)
         let screenshot = app.screenshot()
         let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = "Online Now - Visual review - \(name)"

@@ -138,6 +138,9 @@ public struct TipJarView: View {
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
                         .accessibilityIdentifier("tipJar.error")
+                        #if DEBUG
+                        .accessibilityValue(tippingManager.visualReviewErrorDiagnostics ?? "")
+                        #endif
                 }
             }
         }
@@ -157,26 +160,26 @@ public struct TipJarView: View {
 
 @available(iOS 15.0, macOS 12.0, *)
 private struct TipOptionCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let product: Product
     let isPurchasing: Bool
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(product.displayName)
-                        .font(.headline)
-                    Text("One-time tip")
-                        .font(.subheadline)
-                }
-                Spacer(minLength: 8)
-                if isPurchasing {
-                    ProgressView()
-                        .tint(.white)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 16) {
+                        productDescription
+                        purchasePrice
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text(product.displayPrice)
-                        .font(.title3.bold())
+                    HStack(spacing: 12) {
+                        productDescription
+                        Spacer(minLength: 8)
+                        purchasePrice
+                    }
                 }
             }
             .padding(18)
@@ -189,22 +192,62 @@ private struct TipOptionCard: View {
         .accessibilityValue(isPurchasing ? "Purchase in progress" : "")
         .accessibilityIdentifier("tipJar.purchase")
     }
+
+    private var productDescription: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(product.displayName)
+                .font(.headline)
+            Text("One-time tip")
+                .font(.subheadline)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .multilineTextAlignment(.leading)
+    }
+
+    @ViewBuilder
+    private var purchasePrice: some View {
+        if isPurchasing {
+            ProgressView()
+                .tint(.white)
+        } else {
+            Text(product.displayPrice)
+                .font(.title3.bold())
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 }
 
 @available(iOS 15.0, macOS 12.0, *)
 struct ImpactRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let icon: String
     let text: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(.blue)
-                .frame(width: 22)
-                .accessibilityHidden(true)
-            Text(text)
-                .font(.subheadline)
-                .fixedSize(horizontal: false, vertical: true)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    impactIcon
+                    impactText
+                }
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    impactIcon.frame(width: 22)
+                    impactText
+                }
+            }
         }
+    }
+
+    private var impactIcon: some View {
+        Image(systemName: icon)
+            .foregroundStyle(.blue)
+            .accessibilityHidden(true)
+    }
+
+    private var impactText: some View {
+        Text(text)
+            .font(.subheadline)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

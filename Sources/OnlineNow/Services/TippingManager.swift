@@ -9,6 +9,10 @@ public final class TippingManager: ObservableObject {
     @Published public private(set) var products: [Product] = []
     @Published public private(set) var isLoading = false
     @Published public var errorMessage: String?
+    #if DEBUG
+    /// Sanitized error metadata exists only for explicitly opted-in native QA.
+    @Published private(set) var visualReviewErrorDiagnostics: String?
+    #endif
     @Published public private(set) var isPurchasing = false
     @Published public private(set) var isPending = false
     @Published public private(set) var tipCount = 0
@@ -79,22 +83,6 @@ public final class TippingManager: ObservableObject {
     }
 
     public func loadProducts() async {
-        #if DEBUG
-        let args = ProcessInfo.processInfo.arguments
-        if args.contains("--ui-testing"), args.contains("--visual-review") {
-            // Rendering fixtures only; purchase workflow tests use a real SKTestSession.
-            if args.contains("--tip-loading") {
-                isLoading = true
-                return
-            }
-            if args.contains("--tip-unavailable") {
-                products = []
-                isLoading = false
-                errorMessage = "We couldn’t connect to the App Store. Check your connection and try again."
-                return
-            }
-        }
-        #endif
         guard !isLoading, !isPurchasing else { return }
         guard ledgerIsReadable else { return }
         isLoading = true
@@ -123,6 +111,9 @@ public final class TippingManager: ObservableObject {
         }
         isPurchasing = true
         errorMessage = nil
+        #if DEBUG
+        if visualReviewDiagnosticsEnabled { visualReviewErrorDiagnostics = nil }
+        #endif
         defer { isPurchasing = false }
         do {
             switch try await product.purchase() {
@@ -137,11 +128,56 @@ public final class TippingManager: ObservableObject {
                 errorMessage = "The App Store hasn’t confirmed this tip. Please try again later."
                 return false
             }
+        } catch StoreKitError.userCancelled {
+            // StoreKit may deliver cancellation as either a result or an error.
+            // Neither is a failed payment or a reason to show an error message.
+            return false
+        } catch let error as SKError where error.code == .paymentCancelled {
+            return false
+        } catch is CancellationError {
+            return false
         } catch {
+            #if DEBUG
+            recordVisualReviewError(error)
+            #endif
             errorMessage = "Your tip couldn’t be completed. Please try again."
             return false
         }
     }
+
+    #if DEBUG
+    private var visualReviewDiagnosticsEnabled: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        return args.contains("--ui-testing") && args.contains("--visual-review")
+    }
+
+    /// Deliberately excludes descriptions, userInfo values, accounts, URLs, and payloads.
+    private func recordVisualReviewError(_ error: Error) {
+        guard visualReviewDiagnosticsEnabled else { return }
+        func node(_ current: Error, depth: Int) -> [String: Any] {
+            let bridged = current as NSError
+            var result: [String: Any] = [
+                "type": String(reflecting: type(of: current)),
+                "domain": bridged.domain,
+                "code": bridged.code
+            ]
+            guard depth < 5 else { return result } // At most six nested levels.
+            var underlying: [[String: Any]] = []
+            if let storeKit = current as? StoreKitError,
+               case let .systemError(systemError) = storeKit {
+                underlying.append(node(systemError, depth: depth + 1))
+            }
+            if let nested = bridged.userInfo[NSUnderlyingErrorKey] as? Error {
+                underlying.append(node(nested, depth: depth + 1))
+            }
+            if !underlying.isEmpty { result["underlying"] = underlying }
+            return result
+        }
+        if let data = try? JSONSerialization.data(withJSONObject: node(error, depth: 0), options: [.sortedKeys]) {
+            visualReviewErrorDiagnostics = String(data: data, encoding: .utf8)
+        }
+    }
+    #endif
 
     @discardableResult
     private func process(_ result: VerificationResult<Transaction>) async -> Bool {

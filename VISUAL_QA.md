@@ -45,7 +45,9 @@ physical Wi-Fi/cellular evidence. It does not make a real-money purchase.
 
 Network/storage/tip-catalog fixture logic is guarded by `#if DEBUG` and explicit
 UI-test + visual-review launch flags. Additional accessibility identifiers label
-existing stat cards and recent activity only. The screenshot-only scheme also runs
-the native unit suite and selects the visual review UI test class. No App Store
+existing stat cards and recent activity only. The original visual-review scheme also runs the native unit suite. The follow-up
+scheme selects eleven targeted UI cases and skips the already-tested unit suite.
+A Debug-only, explicitly flagged error diagnostic exposes only error type/domain/code
+through accessibility during review; it never records accounts, URLs, or payloads. No App Store
 metadata, pending submission, or production signing configuration is changed by
 this QA worktree.

@@ -39,16 +39,52 @@ final class TippingStoreKitTests: XCTestCase {
         XCTAssertTrue(unfinished.allSatisfy { $0.state == .purchased })
         XCTAssertEqual(beforeRecovery.tipCount, 0)
 
+        // The test-session purchase API and StoreKit 2 receipt publication are
+        // asynchronous. Establish a real, verified unfinished receipt before
+        // testing startup recovery; a missing receipt is a fixture setup failure.
+        // Reading this sequence must not finish the purchase or grant support.
+        let receiptReady = try await waitUntil(timeout: 10) {
+            for await result in Transaction.unfinished {
+                if case .verified(let transaction) = result,
+                   transaction.id == firstPurchase.id,
+                   transaction.productID == productID,
+                   transaction.productType == .consumable {
+                    return true
+                }
+            }
+            return false
+        }
+        XCTAssertTrue(receiptReady, "The local StoreKit fixture did not publish the verified unfinished consumable before recovery started")
+        guard receiptReady else { return }
+
         let manager = TippingManager(defaults: defaults, startsStoreKit: true)
         let recovered = try await waitUntil(timeout: 10) {
             // Products load only after the unfinished-transaction pass ends.
             manager.tipCount == 1 && !manager.products.isEmpty && !manager.isLoading
         }
         XCTAssertTrue(recovered, "The unfinished consumable was not recovered")
+        // Preserve the recovery failure instead of cascading into a second
+        // same-SKU purchase while its first consumable is still unfinished.
+        guard recovered else { return }
         XCTAssertEqual(manager.tipCount, 1)
         XCTAssertTrue(manager.isSupporter)
         XCTAssertEqual(manager.products.first?.id, productID)
         XCTAssertEqual(manager.products.first?.type, .consumable)
+
+        // Recording support precedes transaction.finish(). If the live update
+        // listener delivers the receipt, the published count alone is not a
+        // finish barrier for another purchase of this consumable.
+        let firstFinished = try await waitUntil(timeout: 10) {
+            for await result in Transaction.unfinished {
+                switch result {
+                case .verified(let transaction), .unverified(let transaction, _):
+                    if transaction.id == firstPurchase.id { return false }
+                }
+            }
+            return true
+        }
+        XCTAssertTrue(firstFinished, "The recovered consumable must finish before purchasing the same tip again")
+        guard firstFinished else { return }
 
         // StoreKit permits another consumable of this SKU after the first has
         // finished. This purchase exercises Transaction.updates independently

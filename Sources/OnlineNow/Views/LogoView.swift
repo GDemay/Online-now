@@ -120,7 +120,7 @@ struct CheckmarkBadge: View {
 
             Image(systemName: "checkmark")
                 .font(.system(size: size, weight: .bold))
-                .foregroundStyle(Color(red: 0.28, green: 0.33, blue: 0.42))
+            .foregroundStyle(.primary)
         }
     }
 }
