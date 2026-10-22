@@ -163,9 +163,28 @@ public final class TippingManager: ObservableObject {
             ]
             guard depth < 5 else { return result } // At most six nested levels.
             var underlying: [[String: Any]] = []
-            if let storeKit = current as? StoreKitError,
-               case let .systemError(systemError) = storeKit {
-                underlying.append(node(systemError, depth: depth + 1))
+            if let storeKit = current as? StoreKitError {
+                if #available(iOS 27.0, macOS 27.0, *) , case .invalidPresentationContext = storeKit {
+                    result["storeKitCase"] = "invalidPresentationContext"
+                } else if #available(iOS 18.4, macOS 15.4, *), case .unsupported = storeKit {
+                    result["storeKitCase"] = "unsupported"
+                } else if #available(iOS 15.4, macOS 12.3, *), case .notEntitled = storeKit {
+                    result["storeKitCase"] = "notEntitled"
+                } else {
+                    switch storeKit {
+                    case .unknown: result["storeKitCase"] = "unknown"
+                    case .userCancelled: result["storeKitCase"] = "userCancelled"
+                    case .networkError: result["storeKitCase"] = "networkError"
+                    case .systemError: result["storeKitCase"] = "systemError"
+                    case .notAvailableInStorefront: result["storeKitCase"] = "notAvailableInStorefront"
+                    default: result["storeKitCase"] = "other"
+                    }
+                }
+                switch storeKit {
+                case let .systemError(systemError): underlying.append(node(systemError, depth: depth + 1))
+                case let .networkError(networkError): underlying.append(node(networkError, depth: depth + 1))
+                default: break
+                }
             }
             if let nested = bridged.userInfo[NSUnderlyingErrorKey] as? Error {
                 underlying.append(node(nested, depth: depth + 1))
