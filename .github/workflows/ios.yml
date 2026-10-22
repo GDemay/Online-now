@@ -1,0 +1,41 @@
+name: iOS verification
+# Verify release branches before shipping; the legacy default branch has no app test scheme.
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select available iPhone simulator
+        run: |
+          xcrun simctl list devices available --json > /tmp/devices.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          devices = json.load(open('/tmp/devices.json'))['devices']
+          candidates = [d for runtime, items in devices.items() if '.iOS-' in runtime for d in items if d['name'].startswith('iPhone')]
+          if not candidates:
+              raise SystemExit('No available iPhone simulator')
+          print('SIMULATOR_ID=' + candidates[0]['udid'])
+          PY
+      - name: Build and test app, persistence, payments, and UI
+        run: |
+          set -o pipefail
+          xcodebuild test -project OnlineNow.xcodeproj -scheme OnlineNow -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO | tee xcodebuild.log
+      - name: Verify Swift package on macOS
+        run: swift test --skip SpeedTestValidationTests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-test-results
+          path: |
+            TestResults.xcresult
+            xcodebuild.log
+          retention-days: 14
