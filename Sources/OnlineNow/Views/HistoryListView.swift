@@ -110,7 +110,7 @@ public struct HistoryListView: View {
             if let error = historyManager.errorMessage {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(.callout)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(OnlineNowColors.warningText(in: colorScheme))
                     .multilineTextAlignment(.center)
             }
             ZStack {
@@ -144,7 +144,7 @@ public struct HistoryListView: View {
                 if let error = historyManager.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(.callout)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(OnlineNowColors.warningText(in: colorScheme))
                 }
                 // Statistics cards
                 statisticsSection
@@ -401,6 +401,7 @@ struct HistoryStatCard: View {
 @available(iOS 17.0, *)
 struct HistoryRowView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
     let check: ConnectivityCheck
 
     var body: some View {
@@ -477,7 +478,7 @@ struct HistoryRowView: View {
             if check.isVPNActive {
                 Label("Possible VPN", systemImage: "lock.shield.fill")
                     .font(.caption)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(OnlineNowColors.informationText(in: colorScheme))
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(check.timestamp, format: .dateTime.month(.abbreviated).day())

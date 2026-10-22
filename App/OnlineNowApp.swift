@@ -15,15 +15,15 @@ struct OnlineNowApp: App {
         #endif
     }
 
+    #if DEBUG
     private var visualReviewColorScheme: ColorScheme? {
-        #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         if args.contains("--ui-testing"), args.contains("--visual-review"), args.contains("--dark-mode") {
             return .dark
         }
-        #endif
         return nil
     }
+    #endif
 
     var body: some Scene {
         WindowGroup {
@@ -34,7 +34,9 @@ struct OnlineNowApp: App {
             } else if let container = storage.container {
                 ConnectivityStatusView()
                     .modelContainer(container)
+                    #if DEBUG
                     .preferredColorScheme(visualReviewColorScheme)
+                    #endif
                     .safeAreaInset(edge: .bottom) {
                         if storage.isTemporary {
                             VStack(spacing: 4) {

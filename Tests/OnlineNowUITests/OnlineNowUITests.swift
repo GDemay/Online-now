@@ -466,8 +466,10 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         waitForReady()
         tap("connectivity.speedTest")
         XCTAssertTrue(app.buttons["connectivity.refresh"].waitForEnabled(timeout: 12))
-        require(app.descendants(matching: .any).matching(identifier: "measurementError").firstMatch)
-        capture("speed-test-failure")
+        let measurementError = identified("measurementError")
+        require(measurementError)
+        scrollTo(measurementError)
+        capture("speed-test-failure", showing: measurementError)
         XCTAssertTrue(app.buttons["connectivity.speedTest"].isEnabled)
     }
 

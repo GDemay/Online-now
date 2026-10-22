@@ -3,6 +3,26 @@ import SwiftUI
 enum OnlineNowColors {
     // Fixed contrast for white button text in both light and dark appearances.
     static let actionFill = Color(red: 0.04, green: 0.28, blue: 0.60)
+
+    static func successText(in scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0.45, green: 0.90, blue: 0.60)
+            : Color(red: 0.02, green: 0.38, blue: 0.16)
+    }
+
+    static func warningText(in scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 1, green: 0.83, blue: 0.55)
+            : Color(red: 0.48, green: 0.25, blue: 0)
+    }
+
+    static func errorText(in scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 1, green: 0.56, blue: 0.59)
+            : Color(red: 0.72, green: 0.05, blue: 0.08)
+    }
+
+    static func informationText(in scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0.50, green: 0.75, blue: 1)
+            : actionFill
+    }
 }
 
 @available(iOS 15.0, macOS 12.0, *)
