@@ -678,6 +678,65 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         capture("history-storage-open-failure")
     }
 
+    /// Optional rotation coverage using the existing isolated network/history and StoreKit fixtures.
+    /// This verifies navigation and reachable controls; it does not make a purchase.
+    @MainActor
+    func testVisualLandscapeNavigation() throws {
+        _ = try configureStore()
+        launch(scenario: "online", seeded: true)
+        waitForReady()
+        defer { XCUIDevice.shared.orientation = .portrait }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        guard waitUntil(10, { self.app.frame.width > self.app.frame.height }) else {
+            capture("landscape-rotation-not-applied")
+            XCTFail("The app declares landscape support but did not rotate within ten seconds")
+            return
+        }
+        capture("landscape-home")
+
+        scrollTo(app.buttons["connectivity.refresh"])
+        tap("connectivity.refresh")
+        waitForReady()
+        scrollTo(app.buttons["connectivity.speedTest"])
+        XCTAssertTrue(app.buttons["connectivity.speedTest"].isHittable)
+        capture("landscape-measurement-actions")
+
+        tap("navigation.history")
+        require(app.buttons["Done"])
+        XCTAssertTrue(app.buttons["Done"].isHittable)
+        require(app.buttons["history.export"])
+        XCTAssertTrue(app.buttons["history.export"].isHittable)
+        XCTAssertTrue(app.buttons["history.clear"].isHittable)
+        capture("landscape-history-overview")
+        scrollTo(identified("history.record"))
+        capture("landscape-history-records")
+        app.buttons["Done"].tap()
+
+        scrollTo(app.buttons["connectivity.speed"])
+        tap("connectivity.speed")
+        require(app.buttons["Done"])
+        XCTAssertTrue(app.buttons["Done"].isHittable)
+        capture("landscape-speed-detail-top")
+        let plot = identified("statDetail.plot")
+        require(plot)
+        scrollTo(plot)
+        capture("landscape-speed-detail-chart")
+        app.buttons["Done"].tap()
+
+        tap("navigation.tipJar")
+        let purchase = app.buttons["tipJar.purchase"]
+        require(purchase, timeout: 15)
+        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        scrollTo(purchase)
+        XCTAssertTrue(purchase.isHittable)
+        XCTAssertTrue(app.buttons["tipJar.close"].isHittable)
+        capture("landscape-tip-jar-purchase")
+        app.buttons["tipJar.close"].tap()
+        require(app.buttons["navigation.history"])
+        XCTAssertTrue(app.buttons["navigation.history"].isHittable)
+        print("ONLINE_NOW_VISUAL_OBSERVATION landscape-navigation-completed=true purchase-attempted=false")
+    }
+
     private func launch(scenario: String, seeded: Bool = false, flags: [String] = []) {
         app.launchArguments = ["--ui-testing", "--visual-review"]
         app.launchArguments.append(scenario == "offline" ? "--offline" : "--scenario-\(scenario)")
