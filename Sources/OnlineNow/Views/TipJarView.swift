@@ -109,7 +109,10 @@ public struct TipJarView: View {
             }
 
             if tippingManager.isLoading {
-                ProgressView("Connecting to the App Store…")
+                ProgressView {
+                    Text("Connecting to the App Store…")
+                        .foregroundStyle(Color.primary.opacity(0.75))
+                }
                     .padding()
                     .accessibilityIdentifier("tipJar.loading")
             } else if tippingManager.products.isEmpty {

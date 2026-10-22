@@ -203,34 +203,43 @@ public struct StatDetailView: View {
                         x: .value("Time", point.timestamp),
                         y: .value(statType.rawValue, point.value)
                     )
-                    .foregroundStyle(statType.color.gradient)
+                    .foregroundStyle(plotColor)
                     .interpolationMethod(.linear)
 
                     AreaMark(
                         x: .value("Time", point.timestamp),
                         y: .value(statType.rawValue, point.value)
                     )
-                    .foregroundStyle(statType.color.opacity(0.1).gradient)
+                    .foregroundStyle(plotColor.opacity(0.1).gradient)
                     .interpolationMethod(.linear)
 
                     PointMark(
                         x: .value("Time", point.timestamp),
                         y: .value(statType.rawValue, point.value)
                     )
-                    .foregroundStyle(statType.color)
+                    .foregroundStyle(plotColor)
                     .symbolSize(30)
                 }
-                .chartYAxisLabel(unit)
+                .chartYAxisLabel {
+                    Text(unit)
+                        .font(.caption)
+                        .foregroundStyle(Color.primary.opacity(0.75))
+                }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: dynamicTypeSize.isAccessibilitySize ? 2 : 4)) { _ in
+                    AxisMarks(values: chartAxisDates) { _ in
                         AxisGridLine()
                         AxisValueLabel(format: dynamicTypeSize.isAccessibilitySize
                             ? .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
                             : .dateTime.hour().minute())
+                            .foregroundStyle(Color.primary.opacity(0.75))
                     }
                 }
                 .chartYAxis {
-                    AxisMarks(values: .automatic(desiredCount: dynamicTypeSize.isAccessibilitySize ? 3 : 5))
+                    AxisMarks(values: .automatic(desiredCount: dynamicTypeSize.isAccessibilitySize ? 3 : 5)) { _ in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel().foregroundStyle(Color.primary.opacity(0.75))
+                    }
                 }
                 // Keep axis labels legible without changing the full-sized
                 // section text or the chart's original accessible data values.
@@ -245,6 +254,17 @@ public struct StatDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("statDetail.chart")
+    }
+
+    private var plotColor: Color {
+        statType == .latency ? OnlineNowColors.warningText(in: colorScheme)
+            : OnlineNowColors.informationText(in: colorScheme)
+    }
+
+    private var chartAxisDates: [Date] {
+        guard let first = chartData.first?.timestamp, let last = chartData.last?.timestamp else { return [] }
+        // Automatic desiredCount is advisory and can still crowd a small chart.
+        return first == last ? [first] : [first, last]
     }
 
     private var benchmarkSection: some View {

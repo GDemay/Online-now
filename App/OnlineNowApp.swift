@@ -56,9 +56,10 @@ struct OnlineNowApp: App {
                     Label("Unable to open history", systemImage: "externaldrive.badge.exclamationmark")
                 } description: {
                     Text("Your saved history has been kept. Try opening the app again.")
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 } actions: {
                     Button("Try Again") { storage = HistoryStorage.open() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(OnlineNowPrimaryButtonStyle())
                 }
             }
         }

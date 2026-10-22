@@ -673,6 +673,21 @@ final class OnlineNowVisualReviewTests: XCTestCase {
         return nil
     }
 
+    func testVisualDarkCharts() throws {
+        launch(scenario: "online", seeded: true, flags: ["--dark-mode"])
+        waitForReady()
+        for (identifier, name) in [("connectivity.speed", "speed"), ("connectivity.latency", "tcp")] {
+            scrollTo(app.buttons[identifier])
+            tap(identifier)
+            require(app.buttons["Done"])
+            let plot = identified("statDetail.plot")
+            require(plot)
+            scrollTo(plot)
+            capture("dark-\(name)-history-chart", showing: plot)
+            app.buttons["Done"].tap()
+        }
+    }
+
     func testVisualDarkMode() throws {
         _ = try configureStore()
         launch(scenario: "online", seeded: true, flags: ["--dark-mode"])
