@@ -69,6 +69,77 @@ final class NetworkServicesRegressionTests: XCTestCase {
             response: response(URL(string: "https://login.example.com")!), for: cloudflare))
     }
 
+    func testGoogleProviderBadgeRejectsLoginPagesRedirectsAndChangedDestinations() async {
+        let url = URL(string: "https://www.google.com/generate_204")!
+        let cases: [(HTTPURLResponse, String, Bool)] = [
+            (response(url, status: 204), "", true),
+            (response(url), "<html>Sign in</html>", false),
+            (response(url, status: 302, headers: ["Location": "https://login.example.com"]), "", false),
+            (response(URL(string: "https://login.example.com/generate_204")!, status: 204), "", false),
+            (response(URL(string: "https://www.google.com/login")!, status: 204), "", false)
+        ]
+        for (http, body, expected) in cases {
+            let fixture = EndpointProtocolFixture(response: http, body: body)
+            defer { fixture.unregister() }
+            let service = ReachabilityService(configuration: fixture.configuration())
+            let reachable = await service.checkEndpoint(url)
+            XCTAssertEqual(reachable, expected, "HTTP \(http.statusCode) from \(http.url!)")
+            XCTAssertEqual(fixture.requests.count, 1, "Each badge should make one provider request")
+            XCTAssertEqual(fixture.requests.first?.httpMethod, "GET")
+            XCTAssertEqual(fixture.requests.first?.cachePolicy, .reloadIgnoringLocalAndRemoteCacheData)
+        }
+    }
+
+    func testCloudflareProviderBadgeRequiresTracePayload() async {
+        let url = URL(string: "https://cloudflare.com/cdn-cgi/trace")!
+        for (body, expected) in [
+            ("h=cloudflare.com\nip=203.0.113.1\n", true),
+            ("<html>Sign in</html>", false),
+            ("h=cloudflare.com\n", false),
+            ("ip=203.0.113.1\n", false)
+        ] {
+            let fixture = EndpointProtocolFixture(response: response(url), body: body)
+            defer { fixture.unregister() }
+            let service = ReachabilityService(configuration: fixture.configuration())
+            let reachable = await service.checkEndpoint(url)
+            XCTAssertEqual(reachable, expected)
+            XCTAssertEqual(fixture.requests.count, 1)
+        }
+    }
+
+    func testProviderBadgeRejectsUnknownOrInsecureEndpointsWithoutNetworkWork() async {
+        let fixture = EndpointProtocolFixture(response: response(speedURL), body: "")
+        defer { fixture.unregister() }
+        let service = ReachabilityService(configuration: fixture.configuration())
+        for address in [
+            "http://www.google.com/generate_204", "https://www.google.com/login",
+            "https://cloudflare.com/", "https://example.com/generate_204",
+            "https://user:password@www.google.com/generate_204",
+            "https://www.google.com:8443/generate_204",
+            "https://www.google.com/generate_204?redirect=login",
+            "https://www.google.com/generate_204#login", "file:///tmp/generate_204"
+        ] {
+            let reachable = await service.checkEndpoint(URL(string: address)!)
+            XCTAssertFalse(reachable, address)
+        }
+        XCTAssertTrue(fixture.requests.isEmpty)
+    }
+
+    func testCancelledProviderBadgeReturnsWithoutStartingNetworkWork() async {
+        let url = URL(string: "https://www.google.com/generate_204")!
+        let fixture = EndpointProtocolFixture(response: response(url, status: 204), body: "")
+        defer { fixture.unregister() }
+        let service = ReachabilityService(configuration: fixture.configuration())
+        let task = Task {
+            while !Task.isCancelled { await Task.yield() }
+            return await service.checkEndpoint(url)
+        }
+        task.cancel()
+        let reachable = await task.value
+        XCTAssertFalse(reachable)
+        XCTAssertTrue(fixture.requests.isEmpty)
+    }
+
     func testCaptivePortalRedirectUsesLocationAndRejectsUnsafeSchemes() {
         let url = URL(string: "http://captive.apple.com/hotspot-detect.html")!
         let redirected = ReachabilityService.captivePortalResult(data: Data(),
@@ -121,4 +192,77 @@ final class NetworkServicesRegressionTests: XCTestCase {
             XCTAssertEqual(result.error, "Invalid URL")
         }
     }
+}
+
+/// XCTest runs the cases in this class serially. The lock protects session callbacks.
+private final class EndpointProtocolFixture: @unchecked Sendable {
+    let response: HTTPURLResponse
+    let data: Data
+    private let lock = NSLock()
+    private var recordedRequests: [URLRequest] = []
+
+    init(response: HTTPURLResponse, body: String) {
+        self.response = response
+        data = Data(body.utf8)
+    }
+
+    var requests: [URLRequest] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedRequests
+    }
+
+    func record(_ request: URLRequest) {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedRequests.append(request)
+    }
+
+    func configuration() -> URLSessionConfiguration {
+        EndpointResponseProtocol.register(self)
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [EndpointResponseProtocol.self]
+        config.timeoutIntervalForRequest = 1
+        config.timeoutIntervalForResource = 1
+        return config
+    }
+
+    func unregister() { EndpointResponseProtocol.unregister(self) }
+}
+
+private final class EndpointResponseProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var activeFixture: EndpointProtocolFixture?
+
+    static func register(_ fixture: EndpointProtocolFixture) {
+        lock.lock()
+        defer { lock.unlock() }
+        precondition(activeFixture == nil, "Provider protocol fixtures must not overlap")
+        activeFixture = fixture
+    }
+
+    static func unregister(_ fixture: EndpointProtocolFixture) {
+        lock.lock()
+        defer { lock.unlock() }
+        if activeFixture === fixture { activeFixture = nil }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.lock.lock()
+        let fixture = Self.activeFixture
+        Self.lock.unlock()
+        guard let fixture else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        fixture.record(request)
+        client?.urlProtocol(self, didReceive: fixture.response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: fixture.data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

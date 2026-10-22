@@ -8,6 +8,10 @@ import SwiftData
 public final class HistoryManager: ObservableObject {
     private let maxHistoryCount = 100
     private var modelContext: ModelContext?
+    private var cachedStatistics = HistoryStatistics(
+        totalChecks: 0, onlineCount: 0, offlineCount: 0,
+        limitedCount: 0, averageSpeedMbps: nil
+    )
     @Published public private(set) var recentChecks: [ConnectivityCheck] = []
     @Published public private(set) var lastCheck: ConnectivityCheck?
     @Published public private(set) var errorMessage: String?
@@ -69,13 +73,13 @@ public final class HistoryManager: ObservableObject {
     }
 
     public func fetchRecentChecks(limit: Int = 20) {
-        guard let context = modelContext else { return }
+        guard modelContext != nil else { return }
         do {
-            var descriptor = FetchDescriptor<ConnectivityCheck>(
-                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-            )
-            descriptor.fetchLimit = max(1, min(limit, maxHistoryCount))
-            recentChecks = try context.fetch(descriptor)
+            // Refresh the summary with the same stored snapshot as the visible
+            // list. Rendering statistics must not fetch or publish an error.
+            let checks = try allChecks()
+            cachedStatistics = Self.statistics(for: checks)
+            recentChecks = Array(checks.prefix(max(1, min(limit, maxHistoryCount))))
             lastCheck = recentChecks.first
             errorMessage = nil
         } catch {
@@ -119,6 +123,7 @@ public final class HistoryManager: ObservableObject {
         do {
             for check in try allChecks() { context.delete(check) }
             try context.save()
+            cachedStatistics = Self.statistics(for: [])
             recentChecks = []
             lastCheck = nil
             errorMessage = nil
@@ -168,14 +173,11 @@ public final class HistoryManager: ObservableObject {
         return ([header] + rows).joined(separator: "\r\n") + "\r\n"
     }
 
-    public func getStatistics() -> HistoryStatistics {
-        let checks: [ConnectivityCheck]
-        do { checks = try allChecks() }
-        catch {
-            errorMessage = "Could not calculate history statistics. \(error.localizedDescription)"
-            return HistoryStatistics(totalChecks: 0, onlineCount: 0, offlineCount: 0,
-                                     limitedCount: 0, averageSpeedMbps: nil)
-        }
+    /// A pure read of the last successfully loaded history snapshot. In
+    /// particular, SwiftUI can call this while rendering without publishing.
+    public func getStatistics() -> HistoryStatistics { cachedStatistics }
+
+    private static func statistics(for checks: [ConnectivityCheck]) -> HistoryStatistics {
         let speeds = checks.compactMap(\.speedMbps).filter { $0.isFinite && $0 >= 0 }
         return HistoryStatistics(
             totalChecks: checks.count,

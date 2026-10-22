@@ -5,6 +5,7 @@ import SwiftUI
 @available(iOS 15.0, macOS 12.0, *)
 public struct TipJarView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var tippingManager: TippingManager
     @State private var selectedProductID: String?
     @State private var showThankYou = false
@@ -27,7 +28,7 @@ public struct TipJarView: View {
                             .font(.title.bold())
                             .accessibilityAddTraits(.isHeader)
                         Text("An optional tip helps keep the app maintained. Every feature stays free, whether you tip or not.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.primary.opacity(0.75))
                     }
                     .multilineTextAlignment(.center)
 
@@ -49,10 +50,10 @@ public struct TipJarView: View {
                                 .font(.headline)
                             Text("\(tippingManager.tipCount) tip\(tippingManager.tipCount == 1 ? "" : "s") recorded on this device")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.primary.opacity(0.75))
                             Text("Consumable tips cannot be restored after reinstalling the app.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.primary.opacity(0.75))
                         }
                         .multilineTextAlignment(.center)
                         .accessibilityElement(children: .combine)
@@ -102,13 +103,16 @@ public struct TipJarView: View {
                 Label("Waiting for approval", systemImage: "clock")
                     .font(.headline)
                 Text("The App Store is waiting for approval. Your support will appear here when the purchase is confirmed.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier("tipJar.pending")
             }
 
             if tippingManager.isLoading {
-                ProgressView("Connecting to the App Store…")
+                ProgressView {
+                    Text("Connecting to the App Store…")
+                        .foregroundStyle(Color.primary.opacity(0.75))
+                }
                     .padding()
                     .accessibilityIdentifier("tipJar.loading")
             } else if tippingManager.products.isEmpty {
@@ -116,25 +120,23 @@ public struct TipJarView: View {
                     .font(.headline)
                     .accessibilityIdentifier("tipJar.unavailable")
                 Text(tippingManager.errorMessage ?? "Check your connection and try again. All app features remain free.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
                 retryButton
             } else {
                 ForEach(tippingManager.products, id: \.id) { product in
-                    TipOptionCard(
-                        product: product,
-                        isPurchasing: tippingManager.isPurchasing && selectedProductID == product.id
-                    ) {
-                        selectedProductID = product.id
-                        Task {
-                            if await tippingManager.purchase(product) { showThankYou = true }
+                    if #available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, *) {
+                        TipPurchaseContext { purchaseAction in
+                            tipOption(for: product) { try await purchaseAction($0) }
                         }
+                    } else {
+                        // Preserve the library's iOS 15/macOS 12 availability.
+                        tipOption(for: product) { try await $0.purchase() }
                     }
-                    .disabled(tippingManager.isPurchasing || tippingManager.isPending)
                 }
                 if let message = tippingManager.errorMessage {
                     Text(message)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(OnlineNowColors.errorText(in: colorScheme))
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
                         .accessibilityIdentifier("tipJar.error")
@@ -143,11 +145,30 @@ public struct TipJarView: View {
         }
     }
 
+    private func tipOption(
+        for product: Product,
+        performPurchase: @escaping @MainActor (Product) async throws -> Product.PurchaseResult
+    ) -> some View {
+        TipOptionCard(
+            product: product,
+            isPurchasing: tippingManager.isPurchasing && selectedProductID == product.id
+        ) {
+            selectedProductID = product.id
+            Task { @MainActor in
+                if await tippingManager.purchase(product, performPurchase: performPurchase) {
+                    showThankYou = true
+                }
+            }
+        }
+        .disabled(tippingManager.isPurchasing || tippingManager.isPending)
+    }
+
     private var retryButton: some View {
         Button {
             Task { await tippingManager.loadProducts() }
         } label: {
             Label("Try again", systemImage: "arrow.clockwise")
+                .foregroundStyle(Color.primary)
                 .frame(minHeight: 44)
         }
         .buttonStyle(.bordered)
@@ -155,33 +176,48 @@ public struct TipJarView: View {
     }
 }
 
+/// Read the action inside the presenting SwiftUI hierarchy so StoreKit receives
+/// the correct scene for its payment confirmation UI. Never store it in a model.
+@available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, *)
+@MainActor
+private struct TipPurchaseContext<Content: View>: View {
+    @Environment(\.purchase) private var purchaseAction
+    let content: (PurchaseAction) -> Content
+
+    init(content: @escaping (PurchaseAction) -> Content) {
+        self.content = content
+    }
+
+    var body: some View { content(purchaseAction) }
+}
+
 @available(iOS 15.0, macOS 12.0, *)
 private struct TipOptionCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let product: Product
     let isPurchasing: Bool
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(product.displayName)
-                        .font(.headline)
-                    Text("One-time tip")
-                        .font(.subheadline)
-                }
-                Spacer(minLength: 8)
-                if isPurchasing {
-                    ProgressView()
-                        .tint(.white)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 16) {
+                        productDescription
+                        purchasePrice
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text(product.displayPrice)
-                        .font(.title3.bold())
+                    HStack(spacing: 12) {
+                        productDescription
+                        Spacer(minLength: 8)
+                        purchasePrice
+                    }
                 }
             }
             .padding(18)
             .foregroundStyle(.white)
-            .background(Color.blue)
+            .background(OnlineNowColors.actionFill)
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
@@ -189,22 +225,62 @@ private struct TipOptionCard: View {
         .accessibilityValue(isPurchasing ? "Purchase in progress" : "")
         .accessibilityIdentifier("tipJar.purchase")
     }
+
+    private var productDescription: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(product.displayName)
+                .font(.headline)
+            Text("One-time tip")
+                .font(.subheadline)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .multilineTextAlignment(.leading)
+    }
+
+    @ViewBuilder
+    private var purchasePrice: some View {
+        if isPurchasing {
+            ProgressView()
+                .tint(.white)
+        } else {
+            Text(product.displayPrice)
+                .font(.title3.bold())
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 }
 
 @available(iOS 15.0, macOS 12.0, *)
 struct ImpactRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let icon: String
     let text: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(.blue)
-                .frame(width: 22)
-                .accessibilityHidden(true)
-            Text(text)
-                .font(.subheadline)
-                .fixedSize(horizontal: false, vertical: true)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    impactIcon
+                    impactText
+                }
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    impactIcon.frame(width: 22)
+                    impactText
+                }
+            }
         }
+    }
+
+    private var impactIcon: some View {
+        Image(systemName: icon)
+            .foregroundStyle(.blue)
+            .accessibilityHidden(true)
+    }
+
+    private var impactText: some View {
+        Text(text)
+            .font(.subheadline)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

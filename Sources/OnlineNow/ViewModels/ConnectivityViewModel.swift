@@ -63,7 +63,7 @@ public final class ConnectivityViewModel: ObservableObject {
             responseTimeMs = nil
             latencyMs = nil
             speedResult = nil
-            signalQuality = "No Signal"
+            signalQuality = "Offline"
             isVPNActive = false
             errorMessage = nil
         case .limitedConnectivity:
@@ -205,7 +205,10 @@ public final class ConnectivityViewModel: ObservableObject {
         reachabilityCheck = { await reachability.checkReachability() }
         latencyMeasurement = { await latency.measureTCPLatency(to: .cloudflare) }
         speedMeasurement = { await speed.measureSpeed(quick: false) }
-        endpointCheck = { await Self.checkEndpointReachable(urlString: $0) }
+        endpointCheck = { urlString in
+            guard let url = URL(string: urlString) else { return false }
+            return await reachability.checkEndpoint(url)
+        }
         #if DEBUG
         usesOfflineFixture = ProcessInfo.processInfo.arguments.contains("--ui-testing")
             && ProcessInfo.processInfo.arguments.contains("--offline")
@@ -289,36 +292,10 @@ public final class ConnectivityViewModel: ObservableObject {
         return await diagnosticService.validateSpeedTest()
     }
 
-    /// Check if a specific endpoint is reachable
-    private static func checkEndpointReachable(urlString: String) async -> Bool {
-        guard let url = URL(string: urlString) else { return false }
-
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 5
-        config.timeoutIntervalForResource = 5
-        config.waitsForConnectivity = false
-
-        let session = URLSession(configuration: config)
-        defer { session.invalidateAndCancel() }
-
-        do {
-            var request = URLRequest(url: url)
-            request.httpMethod = "HEAD"
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-            let (_, response) = try await session.data(for: request)
-            if let httpResponse = response as? HTTPURLResponse {
-                return (200...399).contains(httpResponse.statusCode)
-            }
-            return false
-        } catch {
-            return false
-        }
-    }
-
     /// Describe measured connection quality without inventing scores for missing measurements.
     private func updateSignalQuality() {
         guard isReachable else {
-            signalQuality = "No Signal"
+            signalQuality = isConnected ? "Unavailable" : "Offline"
             return
         }
         var scores: [Int] = []
@@ -353,9 +330,13 @@ public final class ConnectivityViewModel: ObservableObject {
 
     /// Performs one serialized check. Results from an old network or stopped screen are discarded.
     public func performCheck(includeSpeedTest: Bool = false) async {
-        guard !isPreviewMode, !isPerformingCheck else { return }
+        guard !Task.isCancelled, !isPreviewMode, !isPerformingCheck else { return }
         guard isConnected else {
             clearMeasurements()
+            // An explicit offline refresh is still a useful diagnostic sample.
+            // Timers and initial offline snapshots do not call this path.
+            historyManager.recordCheck(isConnected: false, connectionType: .none, isReachable: false)
+            lastCheckTime = Date()
             updateState()
             return
         }
@@ -483,11 +464,11 @@ public final class ConnectivityViewModel: ObservableObject {
         latencyMs = nil
         speedResult = nil
         errorMessage = nil
-        signalQuality = isConnected ? "Unknown" : "No Signal"
+        signalQuality = isConnected ? "Unknown" : "Offline"
     }
 
     private func updateState() {
-        if !isConnected { state = .offline; signalQuality = "No Signal" }
+        if !isConnected { state = .offline; signalQuality = "Offline" }
         else if isPerformingSpeedTest { state = .measuringSpeed }
         else if isPerformingCheck { state = .checking }
         else { state = isReachable ? .online : .limitedConnectivity }

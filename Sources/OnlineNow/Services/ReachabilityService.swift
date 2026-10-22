@@ -61,6 +61,22 @@ public actor ReachabilityService: ReachabilityChecking {
 
     deinit { session.invalidateAndCancel() }
 
+    /// Checks a known provider without treating a redirect or login page as success.
+    /// Uses the same bounded, uncached session as the primary connectivity check.
+    func checkEndpoint(_ url: URL) async -> Bool {
+        guard !Task.isCancelled, Self.isKnownInternetEndpoint(url) else { return false }
+        do {
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            let (data, response) = try await session.data(for: request)
+            guard !Task.isCancelled else { return false }
+            return Self.isExpectedInternetResponse(data: data, response: response, for: url)
+        } catch {
+            return false
+        }
+    }
+
     public func checkReachability() async -> ReachabilityResult {
         let start = ProcessInfo.processInfo.systemUptime
         let endpoints = [
@@ -130,7 +146,7 @@ public actor ReachabilityService: ReachabilityChecking {
     }
 
     static func isExpectedInternetResponse(data: Data, response: URLResponse, for url: URL) -> Bool {
-        guard let http = response as? HTTPURLResponse,
+        guard isKnownInternetEndpoint(url), let http = response as? HTTPURLResponse,
               http.url?.scheme == "https", http.url?.host == url.host,
               http.url?.path == url.path else { return false }
         switch url.host {
@@ -143,6 +159,20 @@ public actor ReachabilityService: ReachabilityChecking {
             return lines.contains { $0.hasPrefix("ip=") } && lines.contains { $0.hasPrefix("h=") }
         case "www.apple.com":
             return http.statusCode == 200 && isAppleSuccess(data)
+        default:
+            return false
+        }
+    }
+
+    private static func isKnownInternetEndpoint(_ url: URL) -> Bool {
+        guard url.scheme == "https", url.port == nil || url.port == 443,
+              url.user == nil, url.password == nil,
+              url.query == nil, url.fragment == nil else { return false }
+        switch (url.host, url.path) {
+        case ("www.google.com", "/generate_204"),
+             ("cloudflare.com", "/cdn-cgi/trace"),
+             ("www.apple.com", "/library/test/success.html"):
+            return true
         default:
             return false
         }

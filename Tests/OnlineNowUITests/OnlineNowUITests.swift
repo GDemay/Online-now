@@ -33,12 +33,19 @@ final class OnlineNowUITests: XCTestCase {
         app.launch()
         let refresh = app.buttons["connectivity.refresh"]
         XCTAssertTrue(refresh.waitForExistence(timeout: 10))
-        refresh.tap()
-        XCTAssertTrue(refresh.waitForEnabled(timeout: 10))
         app.buttons["navigation.history"].tap()
         XCTAssertTrue(app.otherElements["history.empty"].waitForExistence(timeout: 5)
                       || app.staticTexts["history.empty"].exists)
         attachScreenshot(named: "Online Now - Empty history")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+        refresh.tap()
+        XCTAssertTrue(refresh.waitForEnabled(timeout: 10))
+        app.buttons["navigation.history"].tap()
+        XCTAssertTrue(app.buttons["history.export"].waitForExistence(timeout: 5),
+                      "An offline refresh must save a diagnostic history entry")
+        XCTAssertFalse(app.otherElements["history.empty"].exists)
+        attachScreenshot(named: "Online Now - Offline refresh saved in history")
         app.buttons["Done"].tap()
         XCTAssertTrue(refresh.waitForExistence(timeout: 5))
     }
@@ -120,7 +127,92 @@ final class OnlineNowUITests: XCTestCase {
         attachScreenshot(named: "Online Now - Approved Ask to Buy")
     }
 
+    @MainActor
+    func testCancelledTipDoesNotShowFailureOrCreditSupport() async throws {
+        let store = try SKTestSession(configurationFileNamed: "Configuration")
+        storeKitSession = store
+        store.resetToDefaultState()
+        store.disableDialogs = false
+        store.clearTransactions()
+        app.launch()
+        app.buttons["navigation.tipJar"].tap()
+        let purchase = app.buttons["tipJar.purchase"]
+        XCTAssertTrue(purchase.waitForExistence(timeout: 15))
+        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        let initialTipCount = try recordedTipCount()
+        purchase.tap()
+
+        // Dismiss the actual StoreKit confirmation. Injecting .userCancelled
+        // does not reliably preserve the typed error in the simulator service.
+        XCTAssertTrue(waitUntil(timeout: 15) {
+            self.storeKitCheckoutHeading() != nil || self.storeKitDismissButton() != nil
+        }, "The native StoreKit checkout must be visible before testing cancellation")
+        attachScreenshot(named: "Online Now - Native checkout before cancellation", exportForReview: true)
+        if let close = storeKitDismissButton() {
+            close.tap()
+        } else {
+            // Original native phone/iPad captures place X in the leading edge
+            // of the centered checkout header. Use its observed Xcode heading
+            // as the anchor; never tap a guessed location without that heading.
+            let heading = try XCTUnwrap(storeKitCheckoutHeading(), "A checkout heading is required for the coordinate fallback")
+            let screen = app.frame
+            let sheetWidth = min(screen.width - 16, 440)
+            let point = CGPoint(x: screen.midX - sheetWidth / 2 + 32, y: heading.frame.midY)
+            XCTAssertTrue(screen.contains(point))
+            XCTAssertLessThan(point.x, heading.frame.minX)
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: point.x - screen.minX, dy: point.y - screen.minY)).tap()
+        }
+
+        XCTAssertTrue(waitUntil(timeout: 15) {
+            self.storeKitCheckoutHeading() == nil && purchase.exists && purchase.isHittable && purchase.isEnabled
+        }, "Cancelling checkout must dismiss StoreKit and return to the enabled tip action")
+        XCTAssertFalse(app.staticTexts["tipJar.error"].waitForExistence(timeout: 2),
+                       "Choosing to cancel a tip must not be presented as a payment failure")
+        XCTAssertEqual(try recordedTipCount(), initialTipCount)
+        XCTAssertFalse(app.alerts["Thank you!"].exists)
+        XCTAssertFalse(store.allTransactions().contains { $0.state == .purchased || $0.state == .deferred },
+                       "Cancellation must not create a purchased or deferred tip")
+        attachScreenshot(named: "Online Now - Native cancelled tip remains available", exportForReview: true)
+    }
+
+    /// Query existing hosts only: activating a system service would alter the flow.
+    private func runningCheckoutHosts() -> [XCUIApplication] {
+        [XCUIApplication(bundleIdentifier: "com.apple.ios.StoreKitUIService"),
+         XCUIApplication(bundleIdentifier: "com.apple.springboard"), app].filter {
+            $0.state == .runningForeground || $0.state == .runningBackground
+        }
+    }
+
+    private func storeKitCheckoutHeading() -> XCUIElement? {
+        for host in runningCheckoutHosts() {
+            let headings = host.staticTexts.matching(NSPredicate(format: "label == %@", "Xcode"))
+            for heading in headings.allElementsBoundByIndex where heading.exists && heading.isHittable {
+                if !heading.frame.isEmpty && heading.frame.intersects(app.frame) { return heading }
+            }
+        }
+        return nil
+    }
+
+    private func storeKitDismissButton() -> XCUIElement? {
+        let labels = Set(["close", "cancel", "dismiss", "x", "×", "cancel purchase"])
+        for host in runningCheckoutHosts() {
+            for button in host.buttons.allElementsBoundByIndex.reversed() {
+                guard button.identifier != "tipJar.close", button.exists, button.isHittable else { continue }
+                let label = button.label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let identifier = button.identifier.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if labels.contains(label) || labels.contains(identifier) { return button }
+            }
+        }
+        return nil
+    }
+
     func testLargeTextNavigation() throws {
+        let store = try SKTestSession(configurationFileNamed: "Configuration")
+        storeKitSession = store
+        store.resetToDefaultState()
+        store.disableDialogs = true
+        store.clearTransactions()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
         let history = app.buttons["navigation.history"]
@@ -128,6 +220,18 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(history.isHittable)
         history.tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "Online Now - Largest text history")
+        app.buttons["Done"].tap()
+        app.buttons["navigation.tipJar"].tap()
+        let purchase = app.buttons["tipJar.purchase"]
+        XCTAssertTrue(purchase.waitForExistence(timeout: 15))
+        for _ in 0..<10 where !purchase.isHittable {
+            app.scrollViews.allElementsBoundByIndex.last(where: { $0.isHittable })?.swipeUp()
+        }
+        XCTAssertTrue(purchase.isHittable, "The tip action must remain reachable at the largest text size")
+        XCTAssertLessThanOrEqual(purchase.frame.height, app.frame.height - 150,
+                                 "The product title and price must fit together in the visible sheet")
+        attachScreenshot(named: "Online Now - Largest text readable tip option")
     }
 
     private var supportSummary: XCUIElement {

@@ -94,6 +94,8 @@ public struct StatDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var scaledChartHeight: CGFloat = 200
 
     public init(statType: StatType, currentValue: String, unit: String, historyManager: HistoryManager) {
         self.statType = statType
@@ -153,13 +155,13 @@ public struct StatDetailView: View {
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
 
             Text(statType == .speed ? "Last Measured Download Speed" : "Current \(statType.rawValue)")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
@@ -169,28 +171,29 @@ public struct StatDetailView: View {
 
     private var descriptionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("About \(statType.rawValue)", systemImage: "info.circle")
-                .font(.headline)
+            sectionHeading("About \(statType.rawValue)", systemImage: "info.circle")
 
             Text(statType.description)
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("statDetail.description")
     }
 
     private var chartSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("History (Last 20 checks)", systemImage: "chart.xyaxis.line")
-                .font(.headline)
+            sectionHeading("History (Last 20 checks)", systemImage: "chart.xyaxis.line")
 
             if chartData.isEmpty {
                 Text(statType == .speed ? "Run Test Speed to start your speed history." : "Latency history appears after a successful connection check.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 40)
@@ -200,53 +203,97 @@ public struct StatDetailView: View {
                         x: .value("Time", point.timestamp),
                         y: .value(statType.rawValue, point.value)
                     )
-                    .foregroundStyle(statType.color.gradient)
+                    .foregroundStyle(plotColor)
                     .interpolationMethod(.linear)
 
                     AreaMark(
                         x: .value("Time", point.timestamp),
                         y: .value(statType.rawValue, point.value)
                     )
-                    .foregroundStyle(statType.color.opacity(0.1).gradient)
+                    .foregroundStyle(plotColor.opacity(0.1).gradient)
                     .interpolationMethod(.linear)
 
                     PointMark(
                         x: .value("Time", point.timestamp),
                         y: .value(statType.rawValue, point.value)
                     )
-                    .foregroundStyle(statType.color)
+                    .foregroundStyle(plotColor)
                     .symbolSize(30)
                 }
-                .chartYAxisLabel(unit)
+                .chartYAxisLabel {
+                    Text(unit)
+                        .font(.caption)
+                        .foregroundStyle(Color.primary.opacity(0.75))
+                }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                    AxisMarks(values: chartAxisDates) { _ in
                         AxisGridLine()
-                        AxisValueLabel(format: .dateTime.hour().minute())
+                        AxisValueLabel(format: dynamicTypeSize.isAccessibilitySize
+                            ? .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
+                            : .dateTime.hour().minute())
+                            .foregroundStyle(Color.primary.opacity(0.75))
                     }
                 }
-                .frame(height: 200)
+                .chartYAxis {
+                    AxisMarks(values: .automatic(desiredCount: dynamicTypeSize.isAccessibilitySize ? 3 : 5)) { _ in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel().foregroundStyle(Color.primary.opacity(0.75))
+                    }
+                }
+                // Keep axis labels legible without changing the full-sized
+                // section text or the chart's original accessible data values.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                .frame(height: dynamicTypeSize.isAccessibilitySize ? min(480, max(300, scaledChartHeight)) : 200)
                 .accessibilityLabel("\(statType.rawValue) history")
+                .accessibilityIdentifier("statDetail.plot")
             }
         }
         .padding()
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("statDetail.chart")
+    }
+
+    private var plotColor: Color {
+        statType == .latency ? OnlineNowColors.warningText(in: colorScheme)
+            : OnlineNowColors.informationText(in: colorScheme)
+    }
+
+    private var chartAxisDates: [Date] {
+        guard let first = chartData.first?.timestamp, let last = chartData.last?.timestamp else { return [] }
+        // Automatic desiredCount is advisory and can still crowd a small chart.
+        return first == last ? [first] : [first, last]
     }
 
     private var benchmarkSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Benchmarks", systemImage: "ruler")
-                .font(.headline)
+            sectionHeading("Benchmarks", systemImage: "ruler")
 
             ForEach(statType.benchmarks, id: \.label) { benchmark in
-                HStack {
-                    Text(benchmark.label)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text(benchmark.range)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(benchmark.label)
+                                .font(.subheadline.weight(.medium))
+                            Text(benchmark.range)
+                                .font(.subheadline)
+                                .foregroundStyle(Color.primary.opacity(0.75))
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        HStack {
+                            Text(benchmark.label)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text(benchmark.range)
+                                .font(.subheadline)
+                                .foregroundStyle(Color.primary.opacity(0.75))
+                        }
+                    }
                 }
                 .padding(.vertical, 8)
 
@@ -258,12 +305,13 @@ public struct StatDetailView: View {
         .padding()
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("statDetail.benchmarks")
     }
 
     private var tipsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Tips", systemImage: "lightbulb")
-                .font(.headline)
+            sectionHeading("Tips", systemImage: "lightbulb")
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(tipsForStatType, id: \.self) { tip in
@@ -272,9 +320,11 @@ public struct StatDetailView: View {
                             .foregroundStyle(.green)
                             .font(.caption)
                             .padding(.top, 2)
+                            .accessibilityHidden(true)
                         Text(tip)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.primary.opacity(0.75))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -283,6 +333,28 @@ public struct StatDetailView: View {
         .padding()
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("statDetail.tips")
+    }
+
+    @ViewBuilder
+    private func sectionHeading(_ title: String, systemImage: String) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: systemImage)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+        } else {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+        }
     }
 
     private var cardBackground: some View {
