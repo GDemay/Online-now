@@ -16,8 +16,9 @@ public struct ConnectivityStatusView: View {
     @State private var actionTask: Task<Void, Never>?
 
     @MainActor
-    public init(purchasesEnabled: Bool = true) {
-        _viewModel = StateObject(wrappedValue: ConnectivityViewModel(purchasesEnabled: purchasesEnabled))
+    public init(purchasesEnabled: Bool = true, tipPromptsEnabled: Bool = true) {
+        _viewModel = StateObject(wrappedValue: ConnectivityViewModel(
+            purchasesEnabled: purchasesEnabled, tipPromptsEnabled: tipPromptsEnabled))
     }
 
     public var body: some View {

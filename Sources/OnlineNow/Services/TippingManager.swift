@@ -9,6 +9,8 @@ public final class TippingManager: ObservableObject {
     /// A release-wide choice; existing verified deliveries still recover when
     /// new purchases are unavailable.
     public let purchasesEnabled: Bool
+    /// Controls automatic prompts independently of the user-opened tip jar.
+    public let tipPromptsEnabled: Bool
 
     @Published public private(set) var products: [Product] = []
     @Published public private(set) var isLoading = false
@@ -39,15 +41,18 @@ public final class TippingManager: ObservableObject {
     private let historyExportCountKey = "onlinenow.historyExportCount"
     private let lastTipPromptKey = "onlinenow.lastTipPrompt"
 
-    public convenience init(purchasesEnabled: Bool = true) {
-        self.init(defaults: .standard, startsStoreKit: true, purchasesEnabled: purchasesEnabled)
+    public convenience init(purchasesEnabled: Bool = true, tipPromptsEnabled: Bool = true) {
+        self.init(defaults: .standard, startsStoreKit: true,
+                  purchasesEnabled: purchasesEnabled, tipPromptsEnabled: tipPromptsEnabled)
     }
 
     /// Separate persistence and StoreKit startup so accounting can be tested
     /// without contacting the App Store or modifying a user's defaults.
-    init(defaults: UserDefaults, startsStoreKit: Bool, purchasesEnabled: Bool = true) {
+    init(defaults: UserDefaults, startsStoreKit: Bool, purchasesEnabled: Bool = true,
+         tipPromptsEnabled: Bool = true) {
         self.defaults = defaults
         self.purchasesEnabled = purchasesEnabled
+        self.tipPromptsEnabled = tipPromptsEnabled
         if let data = defaults.data(forKey: Self.ledgerKey) {
             do {
                 ledger = try JSONDecoder().decode(TipLedger.self, from: data)
@@ -222,7 +227,7 @@ public final class TippingManager: ObservableObject {
     }
 
     private func checkAndShowTipPrompt(trigger: TipPromptTrigger) {
-        guard purchasesEnabled else { return }
+        guard purchasesEnabled, tipPromptsEnabled else { return }
         guard !shouldShowTipPrompt, !isSupporter else { return }
         let now = Date()
         if let lastPrompt = defaults.object(forKey: lastTipPromptKey) as? Date,

@@ -68,6 +68,9 @@ final class TippingManagerTests: XCTestCase {
     func testFirstSpeedTestAndExportDoNotInterruptWithTipPrompt() {
         withDefaults { defaults in
             let manager = TippingManager(defaults: defaults, startsStoreKit: false)
+            XCTAssertTrue(manager.purchasesEnabled)
+            XCTAssertTrue(manager.tipPromptsEnabled,
+                          "The SDK default must preserve its existing prompt behavior")
             manager.recordSpeedTestCompleted()
             manager.recordHistoryExported()
             XCTAssertFalse(manager.shouldShowTipPrompt)
@@ -76,6 +79,36 @@ final class TippingManagerTests: XCTestCase {
             manager.dismissTipPrompt()
             for _ in 1...10 { manager.recordSpeedTestCompleted() }
             XCTAssertFalse(manager.shouldShowTipPrompt)
+        }
+    }
+
+    func testManualTipsStayEnabledWithoutAutomaticPromptsOrCooldown() {
+        withDefaults { defaults in
+            let manager = TippingManager(
+                defaults: defaults, startsStoreKit: false,
+                purchasesEnabled: true, tipPromptsEnabled: false)
+            XCTAssertTrue(manager.purchasesEnabled,
+                          "Disabling prompts must leave user-initiated tips available")
+            XCTAssertFalse(manager.tipPromptsEnabled)
+
+            for _ in 1...2 {
+                for _ in 1...10 {
+                    manager.recordSpeedTestCompleted()
+                    manager.recordHistoryExported()
+                }
+                XCTAssertFalse(manager.shouldShowTipPrompt)
+                XCTAssertNil(manager.tipPromptTrigger)
+                XCTAssertNil(defaults.object(forKey: "onlinenow.lastTipPrompt"),
+                             "Manual-only tipping must not consume a future prompt cooldown")
+            }
+
+            // A client opting back into the SDK default must retain its prompt
+            // behavior; the manual-only manager must not silently defer it.
+            let defaultManager = TippingManager(defaults: defaults, startsStoreKit: false)
+            for _ in 1...10 { defaultManager.recordSpeedTestCompleted() }
+            XCTAssertTrue(defaultManager.shouldShowTipPrompt)
+            XCTAssertNotNil(defaultManager.tipPromptTrigger)
+            XCTAssertNotNil(defaults.object(forKey: "onlinenow.lastTipPrompt"))
         }
     }
 

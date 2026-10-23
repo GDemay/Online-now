@@ -51,7 +51,6 @@ final class OnlineNowUITests: XCTestCase {
     }
 
     func testDonationPurchaseAndRepeatedTip() throws {
-        enableTippingFixture()
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
         store.resetToDefaultState()
@@ -83,7 +82,6 @@ final class OnlineNowUITests: XCTestCase {
     }
 
     func testAskToBuyApprovalIsDeliveredOnce() throws {
-        enableTippingFixture()
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
         store.resetToDefaultState()
@@ -131,7 +129,6 @@ final class OnlineNowUITests: XCTestCase {
 
     @MainActor
     func testCancelledTipDoesNotShowFailureOrCreditSupport() async throws {
-        enableTippingFixture()
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
         store.resetToDefaultState()
@@ -211,7 +208,6 @@ final class OnlineNowUITests: XCTestCase {
     }
 
     func testLargeTextNavigation() throws {
-        enableTippingFixture()
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
         store.resetToDefaultState()
@@ -229,21 +225,72 @@ final class OnlineNowUITests: XCTestCase {
         app.buttons["navigation.tipJar"].tap()
         let purchase = app.buttons["tipJar.purchase"]
         XCTAssertTrue(purchase.waitForExistence(timeout: 15))
-        for _ in 0..<10 where !purchase.isHittable {
-            app.scrollViews.allElementsBoundByIndex.last(where: { $0.isHittable })?.swipeUp()
-        }
+        try scrollTipCardIntoViewport(purchase)
         XCTAssertTrue(purchase.isHittable, "The tip action must remain reachable at the largest text size")
         XCTAssertLessThanOrEqual(purchase.frame.height, app.frame.height - 150,
                                  "The product title and price must fit together in the visible sheet")
-        attachScreenshot(named: "Online Now - Local tipping fixture - Largest text readable tip option")
+        attachScreenshot(named: "Online Now - Local StoreKit - Largest text readable tip option", exportForReview: true)
     }
 
-    func testFreeReleaseHasNoPurchaseEntryAndKeepsCoreNavigation() throws {
+    func testDefaultOptionalTipsKeepCoreNavigationAvailable() throws {
+        // The app's default tipping policy matches Release. Only the catalog
+        // and isolated offline/history data are local test fixtures.
+        let store = try SKTestSession(configurationFileNamed: "Configuration")
+        storeKitSession = store
+        store.resetToDefaultState()
+        store.disableDialogs = true
+        store.clearTransactions()
+        app.launch()
+
+        let refresh = app.buttons["connectivity.refresh"]
+        XCTAssertTrue(refresh.waitForExistence(timeout: 10))
+        let tipJar = app.buttons["navigation.tipJar"]
+        XCTAssertTrue(tipJar.waitForExistence(timeout: 5))
+        XCTAssertTrue(tipJar.isHittable)
+        XCTAssertEqual(tipJar.label, "Support developer")
+        XCTAssertFalse(app.buttons["tipPrompt.open"].exists)
+        attachScreenshot(named: "Online Now - Default optional tips - Offline Home", exportForReview: true)
+
+        tipJar.tap()
+        let purchase = app.buttons["tipJar.purchase"]
+        XCTAssertTrue(purchase.waitForExistence(timeout: 15))
+        XCTAssertTrue(purchase.waitForEnabled(timeout: 10))
+        XCTAssertTrue(purchase.isHittable)
+        XCTAssertTrue(purchase.label.hasPrefix("Send a one-time tip of "))
+        XCTAssertTrue(app.staticTexts["An optional tip helps keep the app maintained. Every feature stays free, whether you tip or not."].exists)
+        XCTAssertTrue(store.allTransactions().isEmpty,
+                      "Opening the optional tip jar must not start a purchase")
+        attachScreenshot(named: "Online Now - Local StoreKit - Default optional tip jar", exportForReview: true)
+        let close = app.buttons["tipJar.close"]
+        XCTAssertTrue(close.isHittable)
+        close.tap()
+
+        XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+        XCTAssertTrue(refresh.waitForEnabled(timeout: 10))
+        refresh.tap()
+        XCTAssertTrue(refresh.waitForEnabled(timeout: 10))
+        let history = app.buttons["navigation.history"]
+        XCTAssertTrue(history.isHittable)
+        history.tap()
+        XCTAssertTrue(app.buttons["history.export"].waitForExistence(timeout: 5),
+                      "Declining to send a tip must keep saved history and CSV export available")
+        XCTAssertFalse(app.buttons["tipPrompt.open"].exists)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(tipJar.waitForExistence(timeout: 5))
+        XCTAssertTrue(tipJar.isHittable)
+        XCTAssertTrue(store.allTransactions().isEmpty)
+        XCTAssertFalse(app.buttons["tipPrompt.open"].exists)
+    }
+
+    func testDisabledPurchaseSDKFixtureKeepsCoreNavigation() throws {
+        // Exercise the retained public SDK opt-out, rather than the shipping
+        // app's default optional-tip policy.
+        app.launchArguments.append("--purchases-disabled-ui-fixture")
         app.launch()
         let refresh = app.buttons["connectivity.refresh"]
         XCTAssertTrue(refresh.waitForExistence(timeout: 10))
         assertNoPurchaseEntryPoints()
-        attachScreenshot(named: "Online Now - Free release - Offline Home", exportForReview: true)
+        attachScreenshot(named: "Online Now - SDK purchases-disabled fixture - Offline Home", exportForReview: true)
 
         refresh.tap()
         XCTAssertTrue(refresh.waitForEnabled(timeout: 10))
@@ -251,9 +298,9 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(history.isHittable)
         history.tap()
         XCTAssertTrue(app.buttons["history.export"].waitForExistence(timeout: 5),
-                      "The free release must retain saved history and CSV export")
+                      "The purchases-disabled SDK must retain saved history and CSV export")
         assertNoPurchaseEntryPoints()
-        attachScreenshot(named: "Online Now - Free release - Saved offline history", exportForReview: true)
+        attachScreenshot(named: "Online Now - SDK purchases-disabled fixture - Saved offline history", exportForReview: true)
         app.buttons["Done"].tap()
         XCTAssertTrue(refresh.waitForExistence(timeout: 5))
         assertNoPurchaseEntryPoints()
@@ -264,27 +311,157 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(history.waitForExistence(timeout: 10))
         XCTAssertTrue(history.isHittable, "History must remain reachable at the largest text size")
         assertNoPurchaseEntryPoints()
-        attachScreenshot(named: "Online Now - Free release - Largest text Home", exportForReview: true)
+        attachScreenshot(named: "Online Now - SDK purchases-disabled fixture - Largest text Home", exportForReview: true)
         history.tap()
         let done = app.buttons["Done"]
         XCTAssertTrue(done.waitForExistence(timeout: 5))
         XCTAssertTrue(done.isHittable)
         assertNoPurchaseEntryPoints()
-        attachScreenshot(named: "Online Now - Free release - Largest text empty history", exportForReview: true)
+        try expandHistoryForEmptyStateCapture()
+        attachScreenshot(named: "Online Now - SDK purchases-disabled fixture - Largest text empty history", exportForReview: true)
         done.tap()
         XCTAssertTrue(history.waitForExistence(timeout: 5))
-    }
-
-    private func enableTippingFixture() {
-        // These local StoreKit/library regressions do not represent the free
-        // shipping app, whose Release entry point always disables purchases.
-        app.launchArguments.append("--tipping-ui-fixture")
     }
 
     private func assertNoPurchaseEntryPoints(file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertFalse(app.buttons["navigation.tipJar"].exists, file: file, line: line)
         XCTAssertFalse(app.buttons["tipJar.purchase"].exists, file: file, line: line)
         XCTAssertFalse(app.buttons["tipPrompt.open"].exists, file: file, line: line)
+    }
+
+    /// Use the front sheet's scroll view, rather than Home behind an iPad modal.
+    private var activeScrollView: XCUIElement? {
+        app.scrollViews.allElementsBoundByIndex.last {
+            $0.exists && !$0.frame.intersection(app.frame).isEmpty
+        }
+    }
+
+    private func visibleViewport(for scroll: XCUIElement) -> CGRect {
+        var viewport = scroll.frame.intersection(app.frame)
+        for bar in app.navigationBars.allElementsBoundByIndex where bar.exists {
+            let frame = bar.frame
+            if frame.intersects(viewport), frame.width > viewport.width * 0.5,
+               frame.maxY < viewport.maxY {
+                let top = max(viewport.minY, frame.maxY)
+                viewport = CGRect(x: viewport.minX, y: top, width: viewport.width,
+                                  height: viewport.maxY - top)
+            }
+        }
+        return viewport.insetBy(dx: 0, dy: 10)
+    }
+
+    private func verticallyContains(_ frame: CGRect, in viewport: CGRect) -> Bool {
+        !frame.isEmpty && !viewport.isEmpty
+            && frame.minY >= viewport.minY && frame.maxY <= viewport.maxY
+    }
+
+    private func dragFromObservedFrame(from start: CGPoint, to end: CGPoint) {
+        let screen = app.frame
+        XCTAssertTrue(screen.contains(start) && screen.contains(end))
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        origin.withOffset(CGVector(dx: start.x - screen.minX, dy: start.y - screen.minY))
+            .press(forDuration: 0.03, thenDragTo: origin.withOffset(CGVector(
+                dx: end.x - screen.minX, dy: end.y - screen.minY)),
+                   withVelocity: .slow, thenHoldForDuration: 0.1)
+    }
+
+    private func scrollTipCardIntoViewport(_ card: XCUIElement) throws {
+        for _ in 0..<12 {
+            let scroll = try XCTUnwrap(activeScrollView)
+            let viewport = visibleViewport(for: scroll)
+            let frame = card.frame
+            XCTAssertLessThanOrEqual(frame.height, viewport.height,
+                                     "The complete tip card must fit in the visible sheet")
+            if card.isHittable, verticallyContains(frame, in: viewport) { break }
+            let delta = frame.midY - viewport.midY
+            let step = min(viewport.height * 0.25, max(28, abs(delta)))
+            let direction: CGFloat = delta >= 0 ? 1 : -1
+            let x = viewport.minX + viewport.width * 0.88
+            dragFromObservedFrame(
+                from: CGPoint(x: x, y: viewport.midY + direction * step / 2),
+                to: CGPoint(x: x, y: viewport.midY - direction * step / 2))
+        }
+        let viewport = visibleViewport(for: try XCTUnwrap(activeScrollView))
+        XCTAssertTrue(card.isHittable && verticallyContains(card.frame, in: viewport),
+                      "The entire tip card must be inside the visible scroll viewport before capture")
+    }
+
+    private func expandHistoryForEmptyStateCapture() throws {
+        let screen = app.frame
+        let frontBar = {
+            self.app.navigationBars.allElementsBoundByIndex.last {
+                $0.exists && $0.buttons["Done"].exists
+            }
+        }
+        let initial = try XCTUnwrap(frontBar()).frame
+        for _ in 0..<2 {
+            let before = try XCTUnwrap(frontBar()).frame
+            if before.minY <= screen.minY + screen.height * 0.15 { break }
+            let grabber = app.otherElements.matching(NSPredicate(format: "label == %@", "Grabber"))
+                .allElementsBoundByIndex.last {
+                    $0.exists && $0.frame.height < 50
+                        && abs($0.frame.midX - before.midX) < before.width * 0.1
+                        && $0.frame.minY >= before.minY - 40
+                        && $0.frame.maxY <= before.maxY
+                }
+            let start = grabber.map { CGPoint(x: $0.frame.midX, y: $0.frame.midY) }
+                ?? CGPoint(x: before.midX, y: before.minY + min(6, before.height / 4))
+            dragFromObservedFrame(from: start,
+                                  to: CGPoint(x: start.x, y: screen.minY + screen.height * 0.08))
+            if waitUntil(timeout: 3, {
+                guard let updated = frontBar() else { return false }
+                return updated.frame.minY < before.minY - screen.height * 0.1
+            }) { break }
+        }
+        let header = try XCTUnwrap(frontBar()).frame
+        // A regular-width iPad form can remain centered at its largest detent.
+        // Compact phone sheets must actually leave their medium-detent position.
+        if screen.width < 600, initial.minY > screen.minY + screen.height * 0.15 {
+            XCTAssertLessThanOrEqual(header.minY, screen.minY + screen.height * 0.15,
+                                     "Expand the phone History sheet before its largest-text capture")
+        }
+        let empty = app.descendants(matching: .any).matching(identifier: "history.empty").firstMatch
+        XCTAssertTrue(empty.waitForExistence(timeout: 5))
+        let description = app.staticTexts["Your connectivity checks will appear here"]
+        XCTAssertTrue(description.exists && description.isHittable)
+
+        // SwiftUI propagates history.empty to the description StaticText. Its
+        // frame is the text itself, not the native sheet's content viewport.
+        // Identify the sheet by semantic descendants and the observed header,
+        // never by whether a candidate already contains the description frame.
+        let frames = app.otherElements
+            .containing(.navigationBar, identifier: "History")
+            .containing(NSPredicate(format: "label == %@", description.label))
+            .allElementsBoundByIndex
+            .filter { $0.exists }
+            .map { $0.frame }
+        let tolerance: CGFloat = 4
+        let nativeFrame = frames.filter { frame in
+            !frame.isEmpty && frame.intersects(screen)
+                && abs(frame.minX - header.minX) <= tolerance
+                && abs(frame.width - header.width) <= tolerance
+                && frame.insetBy(dx: -tolerance, dy: -tolerance).contains(header)
+                && frame.maxY > header.maxY + 16
+        }.min { $0.width * $0.height < $1.width * $1.height }
+        print("HISTORY_CAPTURE_GEOMETRY candidates=\(frames), header=\(header), description=\(description.frame)")
+        guard let nativeFrame else {
+            attachScreenshot(named: "Online Now - SDK purchases-disabled fixture - Empty History driver diagnostic", exportForReview: true)
+            XCTFail("No observed native History ancestor matches the front header and description")
+            return
+        }
+
+        var viewport = nativeFrame.intersection(screen)
+        let top = max(viewport.minY, header.maxY)
+        viewport = CGRect(x: viewport.minX, y: top, width: viewport.width,
+                          height: max(0, viewport.maxY - top)).insetBy(dx: 8, dy: 8)
+        let containsDescription = !viewport.isEmpty && !description.frame.isEmpty
+            && viewport.contains(description.frame)
+        print("HISTORY_CAPTURE_GEOMETRY nativeAncestor=\(nativeFrame), viewport=\(viewport), containsFullDescription=\(containsDescription)")
+        if !containsDescription {
+            attachScreenshot(named: "Online Now - SDK purchases-disabled fixture - Empty History driver diagnostic", exportForReview: true)
+        }
+        XCTAssertTrue(containsDescription,
+                      "The entire empty-History description must be inside the expanded native content viewport")
     }
 
     private var supportSummary: XCUIElement {

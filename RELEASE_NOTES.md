@@ -1,3 +1,18 @@
+# OnlineNow 1.2.1 — optional-tip candidate
+
+- Restores the optional Support developer button. Every app feature remains free.
+- Tips are user-initiated; automatic tip prompts are disabled in the app.
+- Retains localized StoreKit pricing, visible unavailable/error/pending states,
+  scene-aware checkout, typed cancellation handling and verified repeat/recovery
+  bookkeeping.
+
+This candidate is not submitted or publicly released. Its native Archive/Test
+and signed archive checks are pending at this source checkpoint. Real sandbox
+checkout and Paid Apps Agreement readiness remain unverified. The submitted
+free-only 1.2.0 (45) and its App Store review are unchanged.
+
+## Historical 1.2.0 release notes
+
 # OnlineNow 1.2.0 — prepared free-only update
 
 Public version 1.1 remains live. Version 1.2.0 (17) is rejected under Guideline 2.1(b); no corrected App Store submission has been made at this source checkpoint.
