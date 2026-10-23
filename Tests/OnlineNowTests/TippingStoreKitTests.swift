@@ -251,8 +251,48 @@ final class TippingStoreKitTests: XCTestCase {
         // of the completed startup recovery pass.
         let secondPurchase = try await session.buyProduct(identifier: productID)
         XCTAssertNotEqual(firstPurchase.id, secondPurchase.id)
+
+        // The session purchase call can precede StoreKit 2 receipt publication.
+        // Observe the exact verified receipt without finishing or crediting it;
+        // live handling may already have recorded and finished it first.
+        var observedVerifiedSecondReceipt = false
+        var observedUnverifiedSecondReceipt = false
+        func secondReceiptDiagnostics() -> String {
+            let transactions = session.allTransactions()
+            let states = transactions.map { String(describing: $0.state) }.joined(separator: ",")
+            return "managerCount=\(manager.tipCount), managerError=\(manager.errorMessage ?? "none"), "
+                + "observedVerifiedSecondReceipt=\(observedVerifiedSecondReceipt), "
+                + "observedUnverifiedSecondReceipt=\(observedUnverifiedSecondReceipt), "
+                + "sessionTransactionCount=\(transactions.count), sessionStates=[\(states)]"
+        }
+        let secondReceiptReady = try await waitUntil(timeout: 10) {
+            if manager.tipCount == 2 { return true }
+            for await result in Transaction.unfinished {
+                switch result {
+                case .verified(let transaction):
+                    if transaction.id == secondPurchase.id,
+                       transaction.productID == productID,
+                       transaction.productType == .consumable {
+                        observedVerifiedSecondReceipt = true
+                        return true
+                    }
+                case .unverified(let transaction, _):
+                    if transaction.id == secondPurchase.id,
+                       transaction.productID == productID,
+                       transaction.productType == .consumable {
+                        observedUnverifiedSecondReceipt = true
+                    }
+                }
+            }
+            return manager.tipCount == 2
+        }
+        print("LOCAL_STOREKIT_SECOND_RECEIPT publicationReady=\(secondReceiptReady), \(secondReceiptDiagnostics())")
+        XCTAssertTrue(secondReceiptReady,
+                      "The local StoreKit fixture did not publish the verified second consumable: \(secondReceiptDiagnostics())")
+        guard secondReceiptReady else { return }
+
         let updated = try await waitUntil(timeout: 10) { manager.tipCount == 2 }
-        XCTAssertTrue(updated, "The new consumable was not delivered through Transaction.updates")
+        XCTAssertTrue(updated, "The new consumable was not delivered through Transaction.updates: \(secondReceiptDiagnostics())")
         XCTAssertEqual(manager.tipCount, 2)
         let transactions = session.allTransactions()
         XCTAssertEqual(transactions.count, 2)
@@ -270,6 +310,11 @@ final class TippingStoreKitTests: XCTestCase {
         XCTAssertTrue(finished, "Both consumables must finish after their recorded support is saved")
         let restarted = TippingManager(defaults: defaults, startsStoreKit: false)
         XCTAssertEqual(restarted.tipCount, 2, "Recovered and live transactions must persist exactly once")
+        let savedData = try XCTUnwrap(defaults.data(forKey: "onlinenow.tipLedger.v1"))
+        let savedLedger = try JSONDecoder().decode(TipLedger.self, from: savedData)
+        XCTAssertEqual(Set(savedLedger.entries.keys), Set(purchaseIDs.map { String($0) }),
+                       "The saved support must belong to these exact two verified consumables")
+        XCTAssertTrue(savedLedger.entries.values.allSatisfy { $0.productID == productID && !$0.isRevoked })
     }
 
     private func withLocalProduct(

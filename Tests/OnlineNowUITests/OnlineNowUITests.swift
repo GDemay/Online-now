@@ -225,9 +225,7 @@ final class OnlineNowUITests: XCTestCase {
         app.buttons["navigation.tipJar"].tap()
         let purchase = app.buttons["tipJar.purchase"]
         XCTAssertTrue(purchase.waitForExistence(timeout: 15))
-        for _ in 0..<10 where !purchase.isHittable {
-            app.scrollViews.allElementsBoundByIndex.last(where: { $0.isHittable })?.swipeUp()
-        }
+        try scrollTipCardIntoViewport(purchase)
         XCTAssertTrue(purchase.isHittable, "The tip action must remain reachable at the largest text size")
         XCTAssertLessThanOrEqual(purchase.frame.height, app.frame.height - 150,
                                  "The product title and price must fit together in the visible sheet")
@@ -319,6 +317,7 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(done.waitForExistence(timeout: 5))
         XCTAssertTrue(done.isHittable)
         assertNoPurchaseEntryPoints()
+        try expandHistoryForEmptyStateCapture()
         attachScreenshot(named: "Online Now - SDK purchases-disabled fixture - Largest text empty history", exportForReview: true)
         done.tap()
         XCTAssertTrue(history.waitForExistence(timeout: 5))
@@ -328,6 +327,109 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertFalse(app.buttons["navigation.tipJar"].exists, file: file, line: line)
         XCTAssertFalse(app.buttons["tipJar.purchase"].exists, file: file, line: line)
         XCTAssertFalse(app.buttons["tipPrompt.open"].exists, file: file, line: line)
+    }
+
+    /// Use the front sheet's scroll view, rather than Home behind an iPad modal.
+    private var activeScrollView: XCUIElement? {
+        app.scrollViews.allElementsBoundByIndex.last {
+            $0.exists && !$0.frame.intersection(app.frame).isEmpty
+        }
+    }
+
+    private func visibleViewport(for scroll: XCUIElement) -> CGRect {
+        var viewport = scroll.frame.intersection(app.frame)
+        for bar in app.navigationBars.allElementsBoundByIndex where bar.exists {
+            let frame = bar.frame
+            if frame.intersects(viewport), frame.width > viewport.width * 0.5,
+               frame.maxY < viewport.maxY {
+                let top = max(viewport.minY, frame.maxY)
+                viewport = CGRect(x: viewport.minX, y: top, width: viewport.width,
+                                  height: viewport.maxY - top)
+            }
+        }
+        return viewport.insetBy(dx: 0, dy: 10)
+    }
+
+    private func verticallyContains(_ frame: CGRect, in viewport: CGRect) -> Bool {
+        !frame.isEmpty && !viewport.isEmpty
+            && frame.minY >= viewport.minY && frame.maxY <= viewport.maxY
+    }
+
+    private func dragFromObservedFrame(from start: CGPoint, to end: CGPoint) {
+        let screen = app.frame
+        XCTAssertTrue(screen.contains(start) && screen.contains(end))
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        origin.withOffset(CGVector(dx: start.x - screen.minX, dy: start.y - screen.minY))
+            .press(forDuration: 0.03, thenDragTo: origin.withOffset(CGVector(
+                dx: end.x - screen.minX, dy: end.y - screen.minY)),
+                   withVelocity: .slow, thenHoldForDuration: 0.1)
+    }
+
+    private func scrollTipCardIntoViewport(_ card: XCUIElement) throws {
+        for _ in 0..<12 {
+            let scroll = try XCTUnwrap(activeScrollView)
+            let viewport = visibleViewport(for: scroll)
+            let frame = card.frame
+            XCTAssertLessThanOrEqual(frame.height, viewport.height,
+                                     "The complete tip card must fit in the visible sheet")
+            if card.isHittable, verticallyContains(frame, in: viewport) { break }
+            let delta = frame.midY - viewport.midY
+            let step = min(viewport.height * 0.25, max(28, abs(delta)))
+            let direction: CGFloat = delta >= 0 ? 1 : -1
+            let x = viewport.minX + viewport.width * 0.88
+            dragFromObservedFrame(
+                from: CGPoint(x: x, y: viewport.midY + direction * step / 2),
+                to: CGPoint(x: x, y: viewport.midY - direction * step / 2))
+        }
+        let viewport = visibleViewport(for: try XCTUnwrap(activeScrollView))
+        XCTAssertTrue(card.isHittable && verticallyContains(card.frame, in: viewport),
+                      "The entire tip card must be inside the visible scroll viewport before capture")
+    }
+
+    private func expandHistoryForEmptyStateCapture() throws {
+        let screen = app.frame
+        let frontBar = {
+            self.app.navigationBars.allElementsBoundByIndex.last {
+                $0.exists && $0.buttons["Done"].exists
+            }
+        }
+        let initial = try XCTUnwrap(frontBar()).frame
+        for _ in 0..<2 {
+            let before = try XCTUnwrap(frontBar()).frame
+            if before.minY <= screen.minY + screen.height * 0.15 { break }
+            let grabber = app.otherElements.matching(NSPredicate(format: "label == %@", "Grabber"))
+                .allElementsBoundByIndex.last {
+                    $0.exists && $0.frame.height < 50
+                        && abs($0.frame.midX - before.midX) < before.width * 0.1
+                        && $0.frame.minY >= before.minY - 40
+                        && $0.frame.maxY <= before.maxY
+                }
+            let start = grabber.map { CGPoint(x: $0.frame.midX, y: $0.frame.midY) }
+                ?? CGPoint(x: before.midX, y: before.minY + min(6, before.height / 4))
+            dragFromObservedFrame(from: start,
+                                  to: CGPoint(x: start.x, y: screen.minY + screen.height * 0.08))
+            if waitUntil(timeout: 3, {
+                guard let updated = frontBar() else { return false }
+                return updated.frame.minY < before.minY - screen.height * 0.1
+            }) { break }
+        }
+        let header = try XCTUnwrap(frontBar()).frame
+        // A regular-width iPad form can remain centered at its largest detent.
+        // Compact phone sheets must actually leave their medium-detent position.
+        if screen.width < 600, initial.minY > screen.minY + screen.height * 0.15 {
+            XCTAssertLessThanOrEqual(header.minY, screen.minY + screen.height * 0.15,
+                                     "Expand the phone History sheet before its largest-text capture")
+        }
+        let empty = app.descendants(matching: .any).matching(identifier: "history.empty").firstMatch
+        XCTAssertTrue(empty.waitForExistence(timeout: 5))
+        var viewport = empty.frame.intersection(screen)
+        let top = max(viewport.minY, header.maxY)
+        viewport = CGRect(x: viewport.minX, y: top, width: viewport.width,
+                          height: max(0, viewport.maxY - top)).insetBy(dx: 0, dy: 8)
+        let description = app.staticTexts["Your connectivity checks will appear here"]
+        XCTAssertTrue(description.exists && description.isHittable)
+        XCTAssertTrue(verticallyContains(description.frame, in: viewport),
+                      "The empty-History description must be inside the expanded content viewport")
     }
 
     private var supportSummary: XCUIElement {
