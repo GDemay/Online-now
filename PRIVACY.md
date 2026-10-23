@@ -60,7 +60,7 @@ These requests expose standard connection information, such as your IP address, 
 
 ## Optional Tips
 
-Version 1.2.0 does not offer new donation purchases. Earlier versions may offer optional consumable tips through the App Store under Apple's own privacy terms. Existing verified tip confirmations can still be recovered and stored locally. The app stores verified transaction identifiers and a support count locally to avoid duplicate confirmations and handle refunds. It does not receive your payment card details. Finished consumable tips cannot be restored after reinstalling.
+Version 1.2.0 does not offer new donation purchases. In versions where optional tips are enabled, tips are consumable purchases handled through the App Store under Apple's own privacy terms. Tips are optional and do not unlock app features. Existing verified tip confirmations can still be recovered and stored locally. The app stores verified transaction identifiers and a support count locally to avoid duplicate confirmations and handle refunds. It does not receive your payment card details. Finished consumable tips cannot be restored after reinstalling.
 
 ## Children's Privacy
 
