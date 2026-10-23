@@ -10,6 +10,86 @@ import XCTest
 @available(iOS 17.0, macOS 14.0, *)
 @MainActor
 final class TippingStoreKitTests: XCTestCase {
+    func testDisabledPurchasesDoNotLoadCatalogOrInvokePurchaseAction() async throws {
+        try await withLocalProduct(purchasesEnabled: false) { product, manager, session in
+            await manager.loadProducts()
+            XCTAssertFalse(manager.purchasesEnabled)
+            XCTAssertTrue(manager.products.isEmpty)
+            XCTAssertFalse(manager.isLoading)
+            XCTAssertNil(manager.errorMessage)
+
+            var calls = 0
+            let purchased = await manager.purchase(product, performPurchase: { _ in
+                calls += 1
+                return .userCancelled
+            })
+            XCTAssertFalse(purchased)
+            XCTAssertEqual(calls, 0, "A disabled manager must never start StoreKit checkout")
+            XCTAssertFalse(manager.isPurchasing)
+            XCTAssertFalse(manager.isPending)
+            XCTAssertEqual(manager.tipCount, 0)
+            XCTAssertTrue(session.allTransactions().isEmpty)
+        }
+    }
+
+    func testDisabledPurchasesStillRecoverAndFinishExistingVerifiedTip() async throws {
+        executionTimeAllowance = 60
+        let session = try SKTestSession(configurationFileNamed: "Configuration")
+        session.resetToDefaultState()
+        session.disableDialogs = true
+        session.clearTransactions()
+        defer { session.clearTransactions(); session.resetToDefaultState() }
+
+        let suite = "OnlineNow.DisabledPurchaseRecoveryTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let productID = "onlinenow.gdemay"
+        // Establish an existing purchase before starting the disabled manager.
+        // This fixture lookup is not a lookup initiated by the shipping manager.
+        let products = try await Product.products(for: [productID])
+        let product = try XCTUnwrap(products.first { $0.id == productID })
+        XCTAssertEqual(product.type, .consumable)
+        let purchase = try await session.buyProduct(identifier: productID)
+        let receiptReady = try await waitUntil(timeout: 10) {
+            for await result in Transaction.unfinished {
+                if case .verified(let transaction) = result,
+                   transaction.id == purchase.id,
+                   transaction.productID == productID,
+                   transaction.productType == .consumable {
+                    return true
+                }
+            }
+            return false
+        }
+        XCTAssertTrue(receiptReady, "The fixture must publish a verified existing tip")
+        guard receiptReady else { return }
+
+        let manager = TippingManager(
+            defaults: defaults, startsStoreKit: true, purchasesEnabled: false)
+        let recovered = try await waitUntil(timeout: 10) { manager.tipCount == 1 }
+        XCTAssertTrue(recovered, "Disabling new purchases must not discard an existing verified tip")
+        guard recovered else { return }
+        let finished = try await waitUntil(timeout: 10) {
+            for await result in Transaction.unfinished {
+                switch result {
+                case .verified(let transaction), .unverified(let transaction, _):
+                    if transaction.id == purchase.id { return false }
+                }
+            }
+            return true
+        }
+        XCTAssertTrue(finished, "Existing verified support must be persisted before the receipt is finished")
+        guard finished else { return }
+        XCTAssertTrue(manager.products.isEmpty, "Recovery must not enable the catalog")
+        XCTAssertFalse(manager.isLoading)
+        let restarted = TippingManager(
+            defaults: defaults, startsStoreKit: false, purchasesEnabled: false)
+        XCTAssertEqual(restarted.tipCount, 1)
+        XCTAssertFalse(try restarted.recordVerifiedTip(
+            id: purchase.id, productID: productID, isRevoked: false))
+        XCTAssertEqual(restarted.tipCount, 1, "Recovered support must remain exactly once")
+    }
+
     func testInjectedPurchaseCancellationDoesNotCreditSupportOrShowFailure() async throws {
         try await withLocalProduct { product, manager, session in
             var calls = 0
@@ -193,6 +273,7 @@ final class TippingStoreKitTests: XCTestCase {
     }
 
     private func withLocalProduct(
+        purchasesEnabled: Bool = true,
         _ test: @MainActor (Product, TippingManager, SKTestSession) async throws -> Void
     ) async throws {
         let session = try SKTestSession(configurationFileNamed: "Configuration")
@@ -206,7 +287,8 @@ final class TippingStoreKitTests: XCTestCase {
         let products = try await Product.products(for: ["onlinenow.gdemay"])
         let product = try XCTUnwrap(products.first { $0.id == "onlinenow.gdemay" })
         XCTAssertEqual(product.type, .consumable)
-        let manager = TippingManager(defaults: defaults, startsStoreKit: false)
+        let manager = TippingManager(
+            defaults: defaults, startsStoreKit: false, purchasesEnabled: purchasesEnabled)
         try await test(product, manager, session)
     }
 

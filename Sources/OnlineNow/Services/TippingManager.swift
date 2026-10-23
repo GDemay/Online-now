@@ -6,6 +6,10 @@ import StoreKit
 @available(iOS 15.0, macOS 12.0, *)
 @MainActor
 public final class TippingManager: ObservableObject {
+    /// A release-wide choice; existing verified deliveries still recover when
+    /// new purchases are unavailable.
+    public let purchasesEnabled: Bool
+
     @Published public private(set) var products: [Product] = []
     @Published public private(set) var isLoading = false
     @Published public var errorMessage: String?
@@ -35,14 +39,15 @@ public final class TippingManager: ObservableObject {
     private let historyExportCountKey = "onlinenow.historyExportCount"
     private let lastTipPromptKey = "onlinenow.lastTipPrompt"
 
-    public convenience init() {
-        self.init(defaults: .standard, startsStoreKit: true)
+    public convenience init(purchasesEnabled: Bool = true) {
+        self.init(defaults: .standard, startsStoreKit: true, purchasesEnabled: purchasesEnabled)
     }
 
     /// Separate persistence and StoreKit startup so accounting can be tested
     /// without contacting the App Store or modifying a user's defaults.
-    init(defaults: UserDefaults, startsStoreKit: Bool) {
+    init(defaults: UserDefaults, startsStoreKit: Bool, purchasesEnabled: Bool = true) {
         self.defaults = defaults
+        self.purchasesEnabled = purchasesEnabled
         if let data = defaults.data(forKey: Self.ledgerKey) {
             do {
                 ledger = try JSONDecoder().decode(TipLedger.self, from: data)
@@ -69,7 +74,9 @@ public final class TippingManager: ObservableObject {
                 guard !Task.isCancelled else { return }
                 await self?.process(result)
             }
-            await self?.loadProducts()
+            if self?.purchasesEnabled == true {
+                await self?.loadProducts()
+            }
         }
     }
 
@@ -79,6 +86,7 @@ public final class TippingManager: ObservableObject {
     }
 
     public func loadProducts() async {
+        guard purchasesEnabled else { return }
         guard !isLoading, !isPurchasing else { return }
         guard ledgerIsReadable else { return }
         isLoading = true
@@ -109,6 +117,7 @@ public final class TippingManager: ObservableObject {
         _ product: Product,
         performPurchase: @MainActor (Product) async throws -> Product.PurchaseResult
     ) async -> Bool {
+        guard purchasesEnabled else { return false }
         guard !isPurchasing, !isPending, ledgerIsReadable else { return false }
         guard Self.productIDs.contains(product.id), product.type == .consumable else {
             errorMessage = "This tip option is unavailable. Please reload the tip jar."
@@ -213,6 +222,7 @@ public final class TippingManager: ObservableObject {
     }
 
     private func checkAndShowTipPrompt(trigger: TipPromptTrigger) {
+        guard purchasesEnabled else { return }
         guard !shouldShowTipPrompt, !isSupporter else { return }
         let now = Date()
         if let lastPrompt = defaults.object(forKey: lastTipPromptKey) as? Date,

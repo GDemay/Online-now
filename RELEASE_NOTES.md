@@ -1,49 +1,15 @@
-# OnlineNow 1.2.0 — prepared candidate changes
+# OnlineNow 1.2.0 — prepared free-only update
 
-Latest intended app source: `d258c6c60886ef181881e27e3f4789c98d88fb2b` in PR #6.
-Version 1.2.0 is not live; uploaded build 33 is VALID but older and unattached.
+Public version 1.1 remains live. Version 1.2.0 (17) is rejected under Guideline 2.1(b); no corrected App Store submission has been made at this source checkpoint.
 
-- Reliable connection refresh, foreground lifecycle handling and validated
-  provider status, with a diagnostic record for offline Refresh attempts.
+- Reliable connection refresh, foreground lifecycle handling and validated provider status, including a saved diagnostic record for offline Refresh.
 - Manual speed tests with clear data-use disclosure and separate TCP/HTTP timings.
-- Retain and export the newest 100 checks, with cached summaries, persistence
-  recovery and clearer offline/unavailable states.
-- Scene-aware StoreKit checkout, optional one-time tips, pending and retry states,
-  duplicate-delivery protection and interrupted-purchase recovery.
-- Improved large-text history, charts, benchmarks and tip actions; stronger text
-  and action contrast; a compact phone landscape header.
+- The newest 100 history checks, cached statistics, CSV export and persistence fallback that preserves the existing store.
+- Larger controls, adaptive large-text layouts, readable charts, stronger light/dark contrast and a compact phone landscape header.
+- Every feature remains free. Donation purchasing and prompts are deferred for all shipping users. Existing local support bookkeeping and verified unfinished delivery recovery remain intact.
 
-Candidate 40 passed both required native Archive/Test actions on exact source
-`12f5bfb57b4d13f899f2ae88155f64a93dbaaae3`: **65 passed, seven intentional
-live-network skips, zero failures; all five UI cases passed**. Actual local
-StoreKit checkout dismissal, repeat tips, Ask-to-Buy and recovery are verified.
-Cancellation adds no support credit and does not show a payment failure; earlier
-fault injection returned `StoreKitError.unknown`, which remains a visible error.
+Require a new exact-source native Archive/Test pass and signed archive inspection for this free-only candidate; the result is pending at this source checkpoint. The previous donation-enabled build 43 passed 65 cases with seven intentional live-network skips and no failures, and was uploaded once as VALID / APP_STORE_ELIGIBLE. It is not the free-only binary. Debug-only local StoreKit UI fixtures retain regression coverage and cannot enable purchases in a Release build.
 
-QA 39 passed four cases on both devices (eight outcomes), with 80 original PNGs.
-Detail axes are readable without overlap, although native Charts may omit the
-right endpoint label. Palette QA 41 passed on both devices (two outcomes), with
-all 24 originals reviewed and all 38 measured contrast samples passing.
-**The required final merged-main Archive/Test remains pending.** Only that exact
-final main archive will be selected;
-older passing/uploaded builds do not establish the latest source is verified.
-Account-backed sandbox catalog/purchase readiness and Paid Apps Agreement status
-remain UNKNOWN; local StoreKit testing does not establish those account checks.
+Paid Apps Agreement status remains UNKNOWN; real account-backed catalog and checkout remain UNVERIFIED. Deferring the feature does not establish payment readiness. A later donation-enabled release requires those checks.
 
-PR #6 is merged. Its first required main run (42) passed Archive and all five UI
-cases, but a local StoreKit fixture-readiness assertion failed: 64 passed,
-seven intentional skips and one failure. The test helper is corrected to retain
-its first successful receipt observation; production recovery assertions and
-application code are unchanged. Build 42 was not selected. A fresh exact-source
-required main Archive/Test pass remains the release gate.
-
-Historical **1.2.0 (17)**, source
-`86f8f6d60f3f12c181c1b4512f2635f39b201a1e`, was submitted on 22 October 2026 and
-rejected under Guideline 2.1(b) for an In-App Purchase issue. Its submission remains
-`UNRESOLVED_ISSUES`, the consumable item is `READY_FOR_REVIEW`, and version 1.1
-remains public. Build 17's original result was 53 passed, seven intentional skips,
-zero failures. No replacement has been attached or resubmitted.
-
-Review submission: `dbdb1c40-2d72-4b31-9cbe-d68d393ccc18`.
-See [AUDIT.md](AUDIT.md) for source/run evidence and remaining account checks.
-Retain the published privacy branch while App Store metadata references it.
+Reuse the existing app submission after the deferred IAP item can be removed and all new release gates pass. Preserve the privacy branch and original screenshot evidence. See AUDIT.md and PUBLISHING_GUIDE.md for source-specific records and the latest external checkpoint for subsequent exact build/submission state.
