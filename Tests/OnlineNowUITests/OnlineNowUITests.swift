@@ -422,14 +422,46 @@ final class OnlineNowUITests: XCTestCase {
         }
         let empty = app.descendants(matching: .any).matching(identifier: "history.empty").firstMatch
         XCTAssertTrue(empty.waitForExistence(timeout: 5))
-        var viewport = empty.frame.intersection(screen)
-        let top = max(viewport.minY, header.maxY)
-        viewport = CGRect(x: viewport.minX, y: top, width: viewport.width,
-                          height: max(0, viewport.maxY - top)).insetBy(dx: 0, dy: 8)
         let description = app.staticTexts["Your connectivity checks will appear here"]
         XCTAssertTrue(description.exists && description.isHittable)
-        XCTAssertTrue(verticallyContains(description.frame, in: viewport),
-                      "The empty-History description must be inside the expanded content viewport")
+
+        // SwiftUI propagates history.empty to the description StaticText. Its
+        // frame is the text itself, not the native sheet's content viewport.
+        // Identify the sheet by semantic descendants and the observed header,
+        // never by whether a candidate already contains the description frame.
+        let frames = app.otherElements
+            .containing(.navigationBar, identifier: "History")
+            .containing(NSPredicate(format: "label == %@", description.label))
+            .allElementsBoundByIndex
+            .filter { $0.exists }
+            .map { $0.frame }
+        let tolerance: CGFloat = 4
+        let nativeFrame = frames.filter { frame in
+            !frame.isEmpty && frame.intersects(screen)
+                && abs(frame.minX - header.minX) <= tolerance
+                && abs(frame.width - header.width) <= tolerance
+                && frame.insetBy(dx: -tolerance, dy: -tolerance).contains(header)
+                && frame.maxY > header.maxY + 16
+        }.min { $0.width * $0.height < $1.width * $1.height }
+        print("HISTORY_CAPTURE_GEOMETRY candidates=\(frames), header=\(header), description=\(description.frame)")
+        guard let nativeFrame else {
+            attachScreenshot(named: "Online Now - SDK purchases-disabled fixture - Empty History driver diagnostic", exportForReview: true)
+            XCTFail("No observed native History ancestor matches the front header and description")
+            return
+        }
+
+        var viewport = nativeFrame.intersection(screen)
+        let top = max(viewport.minY, header.maxY)
+        viewport = CGRect(x: viewport.minX, y: top, width: viewport.width,
+                          height: max(0, viewport.maxY - top)).insetBy(dx: 8, dy: 8)
+        let containsDescription = !viewport.isEmpty && !description.frame.isEmpty
+            && viewport.contains(description.frame)
+        print("HISTORY_CAPTURE_GEOMETRY nativeAncestor=\(nativeFrame), viewport=\(viewport), containsFullDescription=\(containsDescription)")
+        if !containsDescription {
+            attachScreenshot(named: "Online Now - SDK purchases-disabled fixture - Empty History driver diagnostic", exportForReview: true)
+        }
+        XCTAssertTrue(containsDescription,
+                      "The entire empty-History description must be inside the expanded native content viewport")
     }
 
     private var supportSummary: XCUIElement {
