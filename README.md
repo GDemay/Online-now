@@ -4,17 +4,23 @@ An iOS app for checking internet access, measuring a short download sample, and
 keeping a local connection history. Built with SwiftUI, Network, SwiftData, and
 StoreKit 2. The app requires iOS 17 or later.
 
-The current work prepares **1.2.0 (3)**. It is a release candidate; native iOS and
-live App Store purchase verification remain outstanding. See [the audit](AUDIT.md)
-and [release notes](RELEASE_NOTES.md).
+The current work prepares a **free-only 1.2.0 update**. Public version 1.1 remains
+live; the earlier 1.2.0 (17) was rejected for an In-App Purchase issue. The new
+candidate defers donation purchasing for every shipping user while retaining the
+core connectivity fixes and existing local support bookkeeping. Exact native
+results and submission state are recorded in [the audit](AUDIT.md),
+[release notes](RELEASE_NOTES.md), and the release checkpoint.
 
 ## Run the iOS app
 
 Open `OnlineNow.xcodeproj` in Xcode, select the shared **OnlineNow** scheme and an
-iPhone/iPad simulator, and run. Debug runs use `Configuration.storekit` for local
-tips. Disable the scheme's StoreKit configuration when testing the real sandbox
-or TestFlight catalog. The app keeps the existing bundle ID
-`com.gdemay.onlinenow` and consumable ID `onlinenow.gdemay`.
+iPhone/iPad simulator, and run. The normal app does not offer new purchases.
+Local library checkout regression tests explicitly pass
+`--ui-testing --tipping-ui-fixture` in Debug and use `Configuration.storekit`.
+Release builds cannot enable that fixture. A future donation-enabled release
+requires account-backed sandbox checks with the local catalog disabled. The
+existing bundle ID `com.gdemay.onlinenow` and consumable ID `onlinenow.gdemay`
+are preserved.
 
 The home screen provides Refresh and Test Speed. Speed tests run only on request,
 use up to 10 MB of sample data per completed test, and show a single-server
@@ -44,9 +50,13 @@ services and the reusable SDK must be tested with Apple's SDKs.
 
 ## Payments and release
 
-Follow [TIPPING_SETUP_GUIDE.md](TIPPING_SETUP_GUIDE.md) for catalog setup and the
-local/sandbox distinction. [AUDIT.md](AUDIT.md) lists the device, storage-upgrade,
-payment and signing checks required before distributing this candidate.
+The free-only update defers donation purchases; existing verified deliveries and
+local support bookkeeping are retained. Paid Apps Agreement status and actual
+account-backed payment readiness remain unverified.
+[TIPPING_SETUP_GUIDE.md](TIPPING_SETUP_GUIDE.md) covers those prerequisites for a
+later donation-enabled release. [PUBLISHING_GUIDE.md](PUBLISHING_GUIDE.md) and
+[AUDIT.md](AUDIT.md) describe the current exact-source release gates and the
+remaining physical-device/storage-upgrade limits.
 
 ## Reusable library
 
