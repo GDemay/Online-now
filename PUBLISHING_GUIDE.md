@@ -1,3 +1,28 @@
+# OnlineNow free-only 1.2.0 release runbook
+
+Updated 23 October 2026. This updates existing app `6758242393`, bundle `com.gdemay.onlinenow`, team `GB87Z9SKC5`. Public version remains 1.1; 1.2.0 (17) is rejected for Guideline 2.1(b), unified submission `dbdb1c40-2d72-4b31-9cbe-d68d393ccc18` is unresolved. Use the existing privately provisioned authentication route. Never print or commit keys/tokens or request credentials again.
+
+## Current free-only release scope
+
+The next binary offers no donation purchasing to any shipping user. It preserves core free features and existing local support bookkeeping/verified unfinished delivery recovery. This defers the unverified IAP; it does not prove account-backed payments or Paid Apps Agreement readiness. A Debug-only opt-in local StoreKit fixture retains SDK regression coverage and is unavailable in Release.
+
+1. Validate the new exact source and require successful native Archive/Test on the resulting main commit. Inspect that exact App Store-signed IPA. Previous build 43 passed 65/7/0 and is VALID, but still contains purchasing and cannot stand in for this candidate.
+2. Upload the new signed archive once if Cloud has not imported it. Read back exact app, version/build, VALID processing and APP_STORE_ELIGIBLE state. Never substitute older 17/33/40/42/43.
+3. Complete matching description, release notes, review instructions and native screenshots. State that donations are deferred. Preserve the ASC-referenced privacy branch and clarify version-specific purchase availability if needed.
+4. Read existing review items again. Remove **only** the first-IAP review item, resource `ZGJkYjFjNDAtMmQ3Mi00YjMxLTljYmUtZDY4ZDM5M2NjYzE4fDE3fGFhNzlhZWQ2LTMwMTUtNDljOC04Y2Y3LWIyOTRkZmZmYWY3NQ`, after the new candidate is verified. Keep the app item and product resource. Apple does not allow a removed item to return to that same submission. Inspect actual removal acceptance; do not assume read-only API/schema discovery proves it will succeed.
+5. Attach the exact new eligible binary to version `5d67ab34-1833-4bab-b3c0-016f2f4f51f1`, apply the complete review explanation, resolve the existing app item based on actual feature removal and native evidence, and resubmit that same intended app submission. Do not create duplicates or resubmit an unverified IAP.
+6. AFTER_APPROVAL remains the intended release policy. Monitor until ASC is READY_FOR_DISTRIBUTION/READY_FOR_SALE and public listings show the updated version. Only then stop the existing automation.
+
+If Apple rejects item removal or reports another concrete blocker, save the response and resolve that actual state before another write. The free-only path removes the offer of IAP; it does not guarantee Apple approval or bypass unrelated account requirements.
+
+## Existing payment verification resources
+
+Build 43 remains VALID/eligible and internally available in group `OnlineNow Release Verification` (`4b19135f-2ae4-4368-ac55-9e0b8f5366bc`). Exactly one verified Account Holder tester is enrolled (`25ea57fd-adc3-4003-bdeb-c53199bb99b6`). Do not recreate/reinvite. The ordinary TestFlight app uses Apple's sandbox; the enrollment does not prove installation/catalog/purchase. Actual Agreement and payment readiness must be observed before offering donations in a later release.
+
+## Historical IAP release commands and evidence
+
+The previous runbook below documents the earlier donation-enabled candidate and reusable CLI commands. Its instructions to include the first IAP apply only to a future donation-enabled release, not the current free-only candidate. Prefer the latest external release checkpoint over historical build/status sentences.
+
 # Online Now 1.2.0 release runbook
 
 This updates the existing app; do not create another App Store Connect app or change its bundle identifier.

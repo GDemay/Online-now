@@ -15,6 +15,18 @@ struct OnlineNowApp: App {
         #endif
     }
 
+    private var usesTippingUIFixture: Bool {
+        #if DEBUG
+        // Keep the library's local StoreKit UI regressions available to XCTest.
+        // The shipping app never offers purchases or enables them by argument.
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.contains("--ui-testing")
+            && arguments.contains("--tipping-ui-fixture")
+        #else
+        return false
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             if isUnitTestHost {
@@ -22,7 +34,7 @@ struct OnlineNowApp: App {
                 // could otherwise finish StoreKit transactions before a test sees them.
                 Color.clear
             } else if let container = storage.container {
-                ConnectivityStatusView()
+                ConnectivityStatusView(purchasesEnabled: usesTippingUIFixture)
                     .modelContainer(container)
                     .safeAreaInset(edge: .bottom) {
                         if storage.isTemporary {

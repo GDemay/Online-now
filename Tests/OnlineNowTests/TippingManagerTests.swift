@@ -78,5 +78,44 @@ final class TippingManagerTests: XCTestCase {
             XCTAssertFalse(manager.shouldShowTipPrompt)
         }
     }
+
+    func testDisabledPurchasesNeverPromptAfterFrequentUse() {
+        withDefaults { defaults in
+            let manager = TippingManager(
+                defaults: defaults, startsStoreKit: false, purchasesEnabled: false)
+            XCTAssertFalse(manager.purchasesEnabled)
+            for _ in 1...100 {
+                manager.recordSpeedTestCompleted()
+                manager.recordHistoryExported()
+            }
+            XCTAssertFalse(manager.shouldShowTipPrompt)
+            XCTAssertNil(manager.tipPromptTrigger)
+            XCTAssertNil(defaults.object(forKey: "onlinenow.lastTipPrompt"),
+                         "Deferring purchases must not consume a future prompt cooldown")
+        }
+    }
+
+    func testDisabledPurchasesKeepLegacyAndVerifiedSupportBookkeeping() throws {
+        try withDefaults { defaults in
+            defaults.set(3, forKey: "onlinenow.tipCount")
+            let manager = TippingManager(
+                defaults: defaults, startsStoreKit: false, purchasesEnabled: false)
+            XCTAssertEqual(manager.tipCount, 3)
+            XCTAssertTrue(manager.isSupporter)
+            XCTAssertTrue(try manager.recordVerifiedTip(
+                id: 91, productID: "onlinenow.gdemay", isRevoked: false))
+            XCTAssertFalse(try manager.recordVerifiedTip(
+                id: 91, productID: "onlinenow.gdemay", isRevoked: false))
+
+            let restarted = TippingManager(
+                defaults: defaults, startsStoreKit: false, purchasesEnabled: false)
+            XCTAssertEqual(restarted.tipCount, 4,
+                           "Deferring new purchases must preserve existing recorded support")
+            XCTAssertTrue(try restarted.recordVerifiedTip(
+                id: 91, productID: "onlinenow.gdemay", isRevoked: true))
+            XCTAssertEqual(restarted.tipCount, 3,
+                           "Verified refunds must still update existing bookkeeping")
+        }
+    }
 }
 #endif

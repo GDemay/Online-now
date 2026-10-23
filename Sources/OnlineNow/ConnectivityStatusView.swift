@@ -9,13 +9,16 @@ public struct ConnectivityStatusView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @StateObject private var viewModel = ConnectivityViewModel()
+    @StateObject private var viewModel: ConnectivityViewModel
     @State private var showHistory = false
     @State private var showTipJar = false
     @State private var selectedStatType: StatType?
     @State private var actionTask: Task<Void, Never>?
 
-    public init() {}
+    @MainActor
+    public init(purchasesEnabled: Bool = true) {
+        _viewModel = StateObject(wrappedValue: ConnectivityViewModel(purchasesEnabled: purchasesEnabled))
+    }
 
     public var body: some View {
         NavigationStack {
@@ -53,19 +56,21 @@ public struct ConnectivityStatusView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showTipJar = true
-                    } label: {
-                        Image(systemName: "cup.and.saucer.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .padding(.horizontal, 12)
-                            .background(.ultraThinMaterial, in: Capsule())
+                if viewModel.tippingManager.purchasesEnabled {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showTipJar = true
+                        } label: {
+                            Image(systemName: "cup.and.saucer.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .padding(.horizontal, 12)
+                                .background(.ultraThinMaterial, in: Capsule())
+                        }
+                        .accessibilityIdentifier("navigation.tipJar")
+                        .accessibilityLabel("Support developer")
                     }
-                    .accessibilityIdentifier("navigation.tipJar")
-                    .accessibilityLabel("Support developer")
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -90,7 +95,9 @@ public struct ConnectivityStatusView: View {
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showTipJar) {
-                TipJarView(tippingManager: viewModel.tippingManager)
+                if viewModel.tippingManager.purchasesEnabled {
+                    TipJarView(tippingManager: viewModel.tippingManager)
+                }
             }
             .sheet(item: $selectedStatType) { statType in
                 StatDetailView(
@@ -135,7 +142,8 @@ public struct ConnectivityStatusView: View {
                 }
             }
             #endif
-            .accessibilityHidden(viewModel.tippingManager.shouldShowTipPrompt)
+            .accessibilityHidden(viewModel.tippingManager.purchasesEnabled
+                                 && viewModel.tippingManager.shouldShowTipPrompt)
             .overlay(alignment: .top) {
                 // Preview mode indicator
                 if viewModel.isPreviewMode {
@@ -157,7 +165,8 @@ public struct ConnectivityStatusView: View {
             }
             .overlay {
                 // Contextual tip prompt
-                if viewModel.tippingManager.shouldShowTipPrompt,
+                if viewModel.tippingManager.purchasesEnabled,
+                    viewModel.tippingManager.shouldShowTipPrompt,
                     let trigger = viewModel.tippingManager.tipPromptTrigger
                 {
                     ZStack {

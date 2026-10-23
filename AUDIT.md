@@ -1,3 +1,36 @@
+# OnlineNow audit and free-only 1.2.0 release
+
+Updated 23 October 2026. Public version **1.1** remains live. Version **1.2.0 (17)** remains rejected under Guideline 2.1(b); submission `dbdb1c40-2d72-4b31-9cbe-d68d393ccc18` has unresolved issues. No replacement is attached or resubmitted at this source checkpoint.
+
+The next candidate defers donation purchasing for every shipping user. The Account Holder's Paid Apps Agreement and a real account-backed StoreKit checkout cannot be verified through the provisioned API key, and no authenticated Apple web session or iOS device is connected. The user requested autonomous completion under full product ownership. Preparing a free-only update allows the core fixes to proceed without claiming the payment problem is verified. Apple review and any other account requirements remain separate gates.
+
+## Candidate behavior and gates
+
+- The shipping app does not offer donation buttons, checkout sheets or contextual prompts. Disabled purchase management skips catalog lookup and returns before purchase initiation.
+- Existing local support bookkeeping is retained. Verified transaction updates and unfinished consumables still recover and finish using the existing deduplicated ledger.
+- The library's purchase-enabled defaults remain available to integrators. Native local StoreKit regressions opt into a clearly named Debug-only UI fixture. Release builds cannot enable that fixture through launch arguments.
+- Connection checks, explicit speed testing, up to 100 retained history records, statistics, CSV export and accessible navigation remain free.
+- Require native Archive and Test on the exact new main source, inspect that exact signed IPA, and verify a new eligible processed build. Build 43 still contains donation purchasing and cannot represent the free-only candidate.
+- Before resubmission, update description/release/review notes, remove only the deferred IAP review item from the existing unresolved submission, inspect actual server state, attach the exact verified replacement and resolve the existing app item. A removed item cannot return to the same submission; the product resource is preserved for a future release.
+
+The new candidate's required native result is **pending at this source checkpoint**. Record later exact-source results externally; do not trigger documentation-only rebuilds to certify a build.
+
+## Validated previous candidate
+
+Merged main `4fa71affe01b351f16f3593609d2cacbc6637cf1`, build **1.2.0 (43)**, passed both required Default Archive/Test actions: **65 passed, seven intentional live-network skips, zero failures**. All five UI workflows passed. Signed IPA SHA-256: `a3d7ddb591ea2f8d1deb04d472745e7bd83a10867f86d3843b4460aedd9b9c93`. It was uploaded once and processed VALID / APP_STORE_ELIGIBLE as `3fff4b4a-828e-4ed9-a0aa-952a1a572579`; it remains unattached to the rejected App Store version. Native local StoreKit success is not account-backed payment proof.
+
+The existing internal TestFlight group `4b19135f-2ae4-4368-ac55-9e0b8f5366bc` contains build 43 and the API-verified Account Holder tester `25ea57fd-adc3-4003-bdeb-c53199bb99b6`. Membership was read back; internal build state is IN_BETA_TESTING. No device installation or purchase is inferred from enrollment. Keep it for future real-storefront verification; do not recreate the group or repeatedly invite the tester.
+
+## Remaining external limits
+
+Paid Apps Agreement status remains UNKNOWN and account-backed StoreKit catalog/checkout remains UNVERIFIED. The free-only release defers those features; it does not establish that payments work. Hardware VoiceOver, radio transitions, constrained networks and a real existing-installation SwiftData upgrade remain unverified. Native Charts may omit the right endpoint time label; rendered labels no longer overlap.
+
+Retain `release/privacy-1.2.0` while ASC references its `PRIVACY.md`. Preserve the 205 original historical review screenshots and their source labels; create clearly scoped supplemental evidence for the new candidate. Keep Default `57AF9F25-C2A1-4994-9DF5-EEB9E437F766` enabled. Disable temporary QA workflows after the new work completes.
+
+## Historical audit evidence
+
+The source-specific findings and previous release record below remain historical evidence. Their older current-status sentences are superseded by the checkpoint above and the latest external release checkpoint.
+
 # OnlineNow 1.2.0 audit and release evidence
 
 Updated 22 October 2026. **Version 1.2.0 (17) was rejected under Guideline

@@ -51,6 +51,7 @@ final class OnlineNowUITests: XCTestCase {
     }
 
     func testDonationPurchaseAndRepeatedTip() throws {
+        enableTippingFixture()
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
         store.resetToDefaultState()
@@ -78,10 +79,11 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(purchase.isEnabled)
         XCTAssertEqual(store.allTransactions().count, 2)
         XCTAssertTrue(waitForRecordedTipCount(initialTipCount + 2, timeout: 10))
-        attachScreenshot(named: "Online Now - Tip jar after repeat tips", exportForReview: true)
+        attachScreenshot(named: "Online Now - Local tipping fixture - Tip jar after repeat tips", exportForReview: true)
     }
 
     func testAskToBuyApprovalIsDeliveredOnce() throws {
+        enableTippingFixture()
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
         store.resetToDefaultState()
@@ -124,11 +126,12 @@ final class OnlineNowUITests: XCTestCase {
                       "Approval must persist exactly one tip across an app restart")
         XCTAssertFalse(pendingMessage.exists)
         XCTAssertEqual(store.allTransactions().count, 1)
-        attachScreenshot(named: "Online Now - Approved Ask to Buy")
+        attachScreenshot(named: "Online Now - Local tipping fixture - Approved Ask to Buy")
     }
 
     @MainActor
     func testCancelledTipDoesNotShowFailureOrCreditSupport() async throws {
+        enableTippingFixture()
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
         store.resetToDefaultState()
@@ -147,7 +150,7 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(waitUntil(timeout: 15) {
             self.storeKitCheckoutHeading() != nil || self.storeKitDismissButton() != nil
         }, "The native StoreKit checkout must be visible before testing cancellation")
-        attachScreenshot(named: "Online Now - Native checkout before cancellation", exportForReview: true)
+        attachScreenshot(named: "Online Now - Local tipping fixture - Native checkout before cancellation", exportForReview: true)
         if let close = storeKitDismissButton() {
             close.tap()
         } else {
@@ -173,7 +176,7 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertFalse(app.alerts["Thank you!"].exists)
         XCTAssertFalse(store.allTransactions().contains { $0.state == .purchased || $0.state == .deferred },
                        "Cancellation must not create a purchased or deferred tip")
-        attachScreenshot(named: "Online Now - Native cancelled tip remains available", exportForReview: true)
+        attachScreenshot(named: "Online Now - Local tipping fixture - Native cancelled tip remains available", exportForReview: true)
     }
 
     /// Query existing hosts only: activating a system service would alter the flow.
@@ -208,6 +211,7 @@ final class OnlineNowUITests: XCTestCase {
     }
 
     func testLargeTextNavigation() throws {
+        enableTippingFixture()
         let store = try SKTestSession(configurationFileNamed: "Configuration")
         storeKitSession = store
         store.resetToDefaultState()
@@ -220,7 +224,7 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(history.isHittable)
         history.tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
-        attachScreenshot(named: "Online Now - Largest text history")
+        attachScreenshot(named: "Online Now - Local tipping fixture - Largest text history")
         app.buttons["Done"].tap()
         app.buttons["navigation.tipJar"].tap()
         let purchase = app.buttons["tipJar.purchase"]
@@ -231,7 +235,56 @@ final class OnlineNowUITests: XCTestCase {
         XCTAssertTrue(purchase.isHittable, "The tip action must remain reachable at the largest text size")
         XCTAssertLessThanOrEqual(purchase.frame.height, app.frame.height - 150,
                                  "The product title and price must fit together in the visible sheet")
-        attachScreenshot(named: "Online Now - Largest text readable tip option")
+        attachScreenshot(named: "Online Now - Local tipping fixture - Largest text readable tip option")
+    }
+
+    func testFreeReleaseHasNoPurchaseEntryAndKeepsCoreNavigation() throws {
+        app.launch()
+        let refresh = app.buttons["connectivity.refresh"]
+        XCTAssertTrue(refresh.waitForExistence(timeout: 10))
+        assertNoPurchaseEntryPoints()
+        attachScreenshot(named: "Online Now - Free release - Offline Home", exportForReview: true)
+
+        refresh.tap()
+        XCTAssertTrue(refresh.waitForEnabled(timeout: 10))
+        let history = app.buttons["navigation.history"]
+        XCTAssertTrue(history.isHittable)
+        history.tap()
+        XCTAssertTrue(app.buttons["history.export"].waitForExistence(timeout: 5),
+                      "The free release must retain saved history and CSV export")
+        assertNoPurchaseEntryPoints()
+        attachScreenshot(named: "Online Now - Free release - Saved offline history", exportForReview: true)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+        assertNoPurchaseEntryPoints()
+
+        app.terminate()
+        app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        XCTAssertTrue(history.waitForExistence(timeout: 10))
+        XCTAssertTrue(history.isHittable, "History must remain reachable at the largest text size")
+        assertNoPurchaseEntryPoints()
+        attachScreenshot(named: "Online Now - Free release - Largest text Home", exportForReview: true)
+        history.tap()
+        let done = app.buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(done.isHittable)
+        assertNoPurchaseEntryPoints()
+        attachScreenshot(named: "Online Now - Free release - Largest text empty history", exportForReview: true)
+        done.tap()
+        XCTAssertTrue(history.waitForExistence(timeout: 5))
+    }
+
+    private func enableTippingFixture() {
+        // These local StoreKit/library regressions do not represent the free
+        // shipping app, whose Release entry point always disables purchases.
+        app.launchArguments.append("--tipping-ui-fixture")
+    }
+
+    private func assertNoPurchaseEntryPoints(file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertFalse(app.buttons["navigation.tipJar"].exists, file: file, line: line)
+        XCTAssertFalse(app.buttons["tipJar.purchase"].exists, file: file, line: line)
+        XCTAssertFalse(app.buttons["tipPrompt.open"].exists, file: file, line: line)
     }
 
     private var supportSummary: XCUIElement {
