@@ -15,15 +15,15 @@ struct OnlineNowApp: App {
         #endif
     }
 
-    private var usesTippingUIFixture: Bool {
+    private var purchasesEnabled: Bool {
         #if DEBUG
-        // Keep the library's local StoreKit UI regressions available to XCTest.
-        // The shipping app never offers purchases or enables them by argument.
+        // Keep the disabled-purchase SDK regressions isolated to XCTest.
+        // The shipping app always enables the tip jar, without an argument override.
         let arguments = ProcessInfo.processInfo.arguments
-        return arguments.contains("--ui-testing")
-            && arguments.contains("--tipping-ui-fixture")
+        return !(arguments.contains("--ui-testing")
+            && arguments.contains("--purchases-disabled-ui-fixture"))
         #else
-        return false
+        return true
         #endif
     }
 
@@ -34,7 +34,7 @@ struct OnlineNowApp: App {
                 // could otherwise finish StoreKit transactions before a test sees them.
                 Color.clear
             } else if let container = storage.container {
-                ConnectivityStatusView(purchasesEnabled: usesTippingUIFixture)
+                ConnectivityStatusView(purchasesEnabled: purchasesEnabled, tipPromptsEnabled: false)
                     .modelContainer(container)
                     .safeAreaInset(edge: .bottom) {
                         if storage.isTemporary {

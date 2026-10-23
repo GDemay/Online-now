@@ -1,3 +1,36 @@
+# OnlineNow optional-tip 1.2.1 candidate runbook
+
+The owner authorized restoring the optional tip button on 23 October 2026.
+Prepare and verify this isolated follow-up while submitted free-only 1.2.0 (45)
+continues through review unchanged. Do not withdraw or replace that submission
+merely to stage the follow-up.
+
+1. Require Archive and Test on the exact 1.2.1 candidate, then inspect its exact
+   signed App Store IPA. Native local StoreKit results must remain labelled as
+   such; do not substitute them for real account-backed payment evidence.
+2. A verified candidate may be uploaded once and assigned to the existing
+   internal verification group. Preserve its existing tester and builds, and do
+   not resend invitations without a new access problem.
+3. Before production donation release, confirm current Paid Apps business
+   readiness and real sandbox product lookup, purchase, cancellation and repeat
+   purchases. Existing API authentication cannot inspect or accept legal business
+   agreements or operate an unconnected phone. Do not claim those gates passed.
+4. Keep the existing consumable `onlinenow.gdemay`. Its review item was removed
+   from the 1.2.0 submission and cannot be added back to that same submission.
+   Once the follow-up is ready and Apple permits its version/submission state,
+   use the appropriate 1.2.1 app/IAP review submission without duplicates. Match
+   description, release/review notes, screenshots and privacy availability to
+   the actual donation-enabled binary.
+5. Retain `release/privacy-1.2.0` while ASC references it. Leave current 1.2.0
+   metadata untouched until a concrete follow-up is eligible to submit.
+
+The 1.2.1 native result is pending at this source checkpoint. Record later
+exact-source results externally without triggering documentation-only builds.
+The existing five-hour task ends at confirmed public update availability or
+October 28, 2026 at 23:59:59 Europe/Paris, whichever comes first.
+
+## Historical free-only runbook
+
 # OnlineNow free-only 1.2.0 release runbook
 
 Updated 23 October 2026. This updates existing app `6758242393`, bundle `com.gdemay.onlinenow`, team `GB87Z9SKC5`. Public version remains 1.1; 1.2.0 (17) is rejected for Guideline 2.1(b), unified submission `dbdb1c40-2d72-4b31-9cbe-d68d393ccc18` is unresolved. Use the existing privately provisioned authentication route. Never print or commit keys/tokens or request credentials again.

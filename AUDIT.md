@@ -1,3 +1,35 @@
+# OnlineNow optional-tip follow-up candidate
+
+Updated 23 October 2026. The owner explicitly authorized restoring optional tips.
+This separate **1.2.1 candidate** restores the user-initiated Support developer
+button while disabling automatic tip prompts. All connectivity features remain
+free. The submitted free-only **1.2.0 (45)** remains unchanged and Waiting for
+Review; public version 1.1 remains live at this source checkpoint.
+
+The existing transaction verification, typed cancellation, repeat consumables,
+deduplication, refund handling and unfinished-delivery recovery are retained.
+The library keeps its purchase/prompt defaults for compatibility; the shipping
+app enables purchases and opts out of prompts. A disabled-purchases UI fixture
+is available only in Debug with both required XCTest launch arguments.
+
+Require native Archive/Test and inspection of the exact signed 1.2.1 archive.
+Those candidate results are pending at this source checkpoint. Local StoreKit
+tests establish SDK behavior, not account-backed payment readiness. The Paid
+Apps Agreement and real sandbox product lookup/purchase/cancellation/repeat
+remain unverified. Do not merge or submit the donation-enabled release until
+actual evidence supports those gates. A staged internal TestFlight build can
+support that verification without changing the current App Store submission.
+
+Preserve the existing privacy branch and both frozen screenshot packages.
+Scheduled work stops on confirmed public release or October 28, 2026 at
+23:59:59 Europe/Paris, whichever comes first. This latest user deadline
+supersedes older indefinite-monitoring text below.
+
+## Historical free-only release record
+
+The source-specific records below describe earlier checkpoints. The external
+release checkpoint contains subsequent exact native and Apple state readbacks.
+
 # OnlineNow audit and free-only 1.2.0 release
 
 Updated 23 October 2026. Public version **1.1** remains live. Version **1.2.0 (17)** remains rejected under Guideline 2.1(b); submission `dbdb1c40-2d72-4b31-9cbe-d68d393ccc18` has unresolved issues. No replacement is attached or resubmitted at this source checkpoint.

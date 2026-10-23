@@ -190,16 +190,18 @@ public final class ConnectivityViewModel: ObservableObject {
     @Published public private(set) var isExpensive = false
     private var cancellables = Set<Combine.AnyCancellable>()
 
-    public convenience init(purchasesEnabled: Bool = true) {
-        self.init(networkMonitor: NetworkMonitor(), purchasesEnabled: purchasesEnabled)
+    public convenience init(purchasesEnabled: Bool = true, tipPromptsEnabled: Bool = true) {
+        self.init(networkMonitor: NetworkMonitor(),
+                  purchasesEnabled: purchasesEnabled, tipPromptsEnabled: tipPromptsEnabled)
     }
 
     init(networkMonitor: NetworkMonitor, tippingManager: TippingManager? = nil,
-         purchasesEnabled: Bool = true) {
+         purchasesEnabled: Bool = true, tipPromptsEnabled: Bool = true) {
         self.networkMonitor = networkMonitor
         diagnosticService = DiagnosticService()
         historyManager = HistoryManager()
-        self.tippingManager = tippingManager ?? TippingManager(purchasesEnabled: purchasesEnabled)
+        self.tippingManager = tippingManager ?? TippingManager(
+            purchasesEnabled: purchasesEnabled, tipPromptsEnabled: tipPromptsEnabled)
         let reachability = ReachabilityService()
         let latency = LatencyMeasurementService()
         let speed = SpeedTestService()

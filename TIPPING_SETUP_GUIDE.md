@@ -2,6 +2,12 @@
 
 Online Now uses StoreKit 2 in-app purchases for an optional, repeatable tip. Every app feature remains free. This is an App Store purchase, not an Apple Pay integration or a charitable donation.
 
+The separate 1.2.1 candidate restores the user-initiated Support developer
+button and disables automatic prompts. Submitted free-only 1.2.0 (45) remains
+unchanged. Native candidate validation and actual account-backed readiness must
+be recorded separately before production donation submission; a retained
+historical or local-StoreKit build does not satisfy that gate.
+
 ## Catalog and App Store Connect
 
 The app and `Configuration.storekit` use one product:
